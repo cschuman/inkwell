@@ -3,7 +3,7 @@
 #define MDVIEWER_VERSION_MAJOR 1
 #define MDVIEWER_VERSION_MINOR 1
 #define MDVIEWER_VERSION_PATCH 0
-#define MDVIEWER_BUILD_NUMBER 13
+#define MDVIEWER_BUILD_NUMBER 14
 
 // Build timestamp - will be updated by build script
 #define MDVIEWER_BUILD_DATE __DATE__
@@ -20,7 +20,7 @@
 
 // Git commit hash (will be set by build script)
 #ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH "unknown"
+#define GIT_COMMIT_HASH "a4a7d9d"
 #endif
 
 namespace mdviewer {

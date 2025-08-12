@@ -1,15 +1,19 @@
-# Markdown Viewer - High-Performance Native macOS App
+# Inkwell - High-Performance Native macOS Markdown Viewer
 
-A blazingly fast, native markdown viewer for macOS built with C++ and Metal acceleration.
+A blazingly fast, native markdown viewer for macOS built with C++20 and Metal GPU acceleration.
 
 ## Features
 
-### Core Features (MVP)
+### Core Features
 - **Instant Preview**: Zero-latency rendering with virtual scrolling
-- **Focus Mode**: Dims all content except current paragraph with typewriter scrolling
+- **Focus Mode**: Immersive reading with elegant vignette overlay (Cmd+.)
 - **Smart TOC**: Floating, collapsible table of contents with instant navigation
-- **Live File Watching**: Auto-refresh with diff highlighting
+- **Live File Watching**: Auto-refresh with FSEvents monitoring
 - **Quick Look Integration**: Space bar preview in Finder
+- **Command Palette**: Quick actions and navigation (Cmd+K)
+- **Vim Navigation**: j/k for scrolling, gg/G for document navigation
+- **Reading Stats**: Word count and estimated reading time
+- **Export to PDF**: Native print/export functionality
 
 ### Performance
 - **10x faster** file opening than Electron-based alternatives
@@ -41,21 +45,33 @@ Platform Layer (Objective-C++):
 └── Metal shader pipeline
 ```
 
-## Building
+## Installation
 
-### Requirements
+### Download Pre-built Binary
+Coming soon - check [Releases](https://github.com/cschuman/inkwell/releases)
+
+### Build from Source
+
+#### Requirements
 - macOS 11.0+
 - Xcode 13+ with C++20 support
 - CMake 3.20+
 - vcpkg package manager
 
-### Build Instructions
+#### Build Instructions
+
+Quick build:
+```bash
+./build.sh
+```
+
+Or manually:
 ```bash
 # Install dependencies
 vcpkg install
 
 # Configure with CMake
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[vcpkg root]/scripts/buildsystems/vcpkg.cmake
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
 
 # Build
 cmake --build build
@@ -63,18 +79,20 @@ cmake --build build
 # Run tests
 ctest --test-dir build
 
-# Install
-cmake --install build
+# Install to /Applications
+cmake --install build --prefix /Applications
 ```
 
 ## Usage
 
 ### Keyboard Shortcuts
-- `Cmd+F`: Toggle focus mode
-- `Cmd+T`: Toggle typewriter mode
-- `Tab`: Show/hide table of contents
-- `Cmd+/`: Display reading statistics
-- `Cmd+Click`: Edit in default editor
+- `Cmd+K`: Open command palette
+- `Cmd+.`: Toggle focus mode
+- `Cmd+P`: Print/Export to PDF
+- `j/k`: Scroll down/up (Vim style)
+- `h/l`: Scroll left/right
+- `gg`: Go to top (press g twice)
+- `G`: Go to bottom
 
 ### Command Line
 ```bash
@@ -87,7 +105,7 @@ qlmanage -p document.md
 
 ## Performance Benchmarks
 
-| Operation | Markdown Viewer | Typical Electron App |
+| Operation | Inkwell | Typical Electron App |
 |-----------|----------------|---------------------|
 | 10MB file open | 47ms | 520ms |
 | Memory usage (idle) | 35MB | 180MB |
@@ -103,11 +121,11 @@ qlmanage -p document.md
 - ✅ File watching with FSEvents
 - ✅ Basic Quick Look plugin
 
-### Phase 2 (In Progress)
-- [ ] Reading statistics dashboard
-- [ ] Export to PDF/HTML
-- [ ] Theme customization
-- [ ] Gesture navigation
+### Phase 2 (Complete)
+- ✅ Reading statistics dashboard
+- ✅ Export to PDF
+- ✅ Focus Mode with vignette effects
+- ✅ Vim navigation keys
 
 ### Phase 3 (Planned)
 - [ ] Wiki-links with graph visualization
