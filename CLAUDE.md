@@ -92,3 +92,7 @@ Inkwell is a high-performance native macOS Markdown viewer built with C++20 and 
 - **CoreText**: Typography and font rendering
 - **Quartz**: Quick Look plugin support
 - **FSEvents**: File system monitoring
+
+## Git Commit Guidelines
+
+When creating git commits, DO NOT add Claude attribution or co-authorship lines. Use clean, standard commit messages without any AI-related signatures or emojis.
