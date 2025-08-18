@@ -1,13 +1,13 @@
 #include "rendering/text_layout.h"
 #include <CoreText/CoreText.h>
-#include <parallel_hashmap/phmap.h>
+#include <unordered_map>
 #include <algorithm>
 
 namespace mdviewer {
 
 class TextLayout::Impl {
 public:
-    phmap::flat_hash_map<std::string, CTFontRef_t> font_cache;
+    std::unordered_map<std::string, CTFontRef_t> font_cache;
     std::unique_ptr<GlyphCache> glyph_cache;
     
     Impl() : glyph_cache(std::make_unique<GlyphCache>()) {}
@@ -354,7 +354,7 @@ void TextLayout::apply_optical_margin_alignment(Line& line) {
 // GlyphCache implementation
 class GlyphCache::Impl {
 public:
-    phmap::flat_hash_map<uint64_t, CachedGlyph> cache;
+    std::unordered_map<uint64_t, CachedGlyph> cache;
     size_t total_memory = 0;
     
     uint64_t make_key(uint32_t codepoint, CTFontRef_t font) {

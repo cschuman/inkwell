@@ -428,11 +428,11 @@ extern "C" void showSimpleCommandPalette();
     NSTextView* _textView;
     NSScrollView* _scrollView;
     NSTextField* _statusLabel;
-    NSTextField* _readingTimeLabel;
+    // NSTextField* _readingTimeLabel; // Removed - no floating badge
     NSView* _topScrollIndicator;
     NSView* _bottomScrollIndicator;
     BOOL _focusModeEnabled;
-    NSView* _focusOverlay;
+    // NSView* _focusOverlay; // Removed - no focus overlay/vignette
     NSSplitView* _splitView;
     NSOutlineView* _tocOutlineView;
     NSScrollView* _tocScrollView;
@@ -606,48 +606,7 @@ extern "C" void showSimpleCommandPalette();
                             mdviewer::getBuildNumber()];
     [_statusLabel setStringValue:statusText];
     
-    // Create reading time label (floating at top right) with premium design
-    NSRect readingTimeFrame = NSMakeRect(frame.size.width - 170, frame.size.height - 70, 160, 36);
-    _readingTimeLabel = [[NSTextField alloc] initWithFrame:readingTimeFrame];
-    [_readingTimeLabel setEditable:NO];
-    [_readingTimeLabel setBordered:NO];
-    [_readingTimeLabel setDrawsBackground:YES];
-    
-    // Glass morphism effect with blur
-    NSVisualEffectView* badgeBlur = [[NSVisualEffectView alloc] initWithFrame:readingTimeFrame];
-    badgeBlur.material = NSVisualEffectMaterialHUDWindow;
-    badgeBlur.blendingMode = NSVisualEffectBlendingModeBehindWindow;
-    badgeBlur.state = NSVisualEffectStateActive;
-    badgeBlur.wantsLayer = YES;
-    badgeBlur.layer.cornerRadius = 18;
-    badgeBlur.layer.masksToBounds = YES;
-    badgeBlur.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
-    
-    // Premium gradient background
-    CAGradientLayer* badgeGradient = [CAGradientLayer layer];
-    badgeGradient.frame = CGRectMake(0, 0, 160, 36);
-    badgeGradient.colors = @[
-        (id)[[NSColor systemBlueColor] colorWithAlphaComponent:0.9].CGColor,
-        (id)[[NSColor systemPurpleColor] colorWithAlphaComponent:0.9].CGColor
-    ];
-    badgeGradient.startPoint = CGPointMake(0, 0);
-    badgeGradient.endPoint = CGPointMake(1, 1);
-    badgeGradient.cornerRadius = 18;
-    
-    [_readingTimeLabel setBackgroundColor:[NSColor clearColor]];
-    [_readingTimeLabel setFont:[NSFont systemFontOfSize:13 weight:NSFontWeightMedium]];
-    [_readingTimeLabel setTextColor:[NSColor whiteColor]];
-    [_readingTimeLabel setAlignment:NSTextAlignmentCenter];
-    [_readingTimeLabel setStringValue:@"📖 Calculating..."];
-    [_readingTimeLabel setWantsLayer:YES];
-    _readingTimeLabel.layer = badgeGradient;
-    
-    // Add premium shadow
-    _readingTimeLabel.layer.shadowColor = [[NSColor blackColor] CGColor];
-    _readingTimeLabel.layer.shadowOpacity = 0.3;
-    _readingTimeLabel.layer.shadowOffset = CGSizeMake(0, 4);
-    _readingTimeLabel.layer.shadowRadius = 12;
-    _readingTimeLabel.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+    // Reading time label removed - no floating badge in top right
     _statusLabel.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     [view addSubview:_statusLabel];
     
@@ -746,8 +705,7 @@ extern "C" void showSimpleCommandPalette();
                                                  name:NSViewBoundsDidChangeNotification
                                                object:[_scrollView contentView]];
     
-    // Add reading time label on top of everything else
-    [view addSubview:_readingTimeLabel positioned:NSWindowAbove relativeTo:nil];
+    // Reading time label removed - no longer added to view
     
     // Add edge indicators on top
     if (_topScrollIndicator && _bottomScrollIndicator) {
@@ -2373,52 +2331,22 @@ extern "C" void showSimpleCommandPalette();
 // MARK: - Focus Mode
 
 - (void)setupFocusMode {
-    if (!self.view) return;
-    NSRect frame = self.view.frame;
-    
-    // Create focus overlay with vignette effect
-    _focusOverlay = [[NSView alloc] initWithFrame:frame];
-    _focusOverlay.wantsLayer = YES;
-    _focusOverlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    
-    // Create radial gradient for vignette effect
-    CAGradientLayer* vignetteLayer = [CAGradientLayer layer];
-    vignetteLayer.frame = _focusOverlay.bounds;
-    vignetteLayer.type = kCAGradientLayerRadial;
-    vignetteLayer.colors = @[
-        (id)[NSColor clearColor].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.0].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.3].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.6].CGColor
-    ];
-    vignetteLayer.locations = @[@0.0, @0.3, @0.7, @1.0];
-    vignetteLayer.startPoint = CGPointMake(0.5, 0.5);
-    vignetteLayer.endPoint = CGPointMake(1.0, 1.0);
-    
-    _focusOverlay.layer = vignetteLayer;
-    _focusOverlay.alphaValue = 0.0; // Initially hidden
+    // Focus mode disabled - no vignette or overlay effects
     _focusModeEnabled = NO;
-    
-    // Add to view
-    [self.view addSubview:_focusOverlay positioned:NSWindowAbove relativeTo:_scrollView];
 }
 
 - (void)toggleFocusMode {
     _focusModeEnabled = !_focusModeEnabled;
     
-    // Animate the focus overlay
+    // Focus mode simplified - no overlay or vignette effects
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
         context.duration = 0.5;
         context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
         
         if (_focusModeEnabled) {
-            // Enter focus mode
-            _focusOverlay.animator.alphaValue = 1.0;
-            
-            // Hide distractions
+            // Enter focus mode - just subtle UI changes
             _tocScrollView.animator.alphaValue = 0.3;
             _statusLabel.animator.alphaValue = 0.3;
-            _readingTimeLabel.animator.alphaValue = 0.5;
             
             // Hide scroll indicators temporarily
             _topScrollIndicator.animator.alphaValue = 0.0;
@@ -2428,12 +2356,10 @@ extern "C" void showSimpleCommandPalette();
             [[NSNotificationCenter defaultCenter] postNotificationName:@"FocusModeEnabled" object:nil];
         } else {
             // Exit focus mode
-            _focusOverlay.animator.alphaValue = 0.0;
             
             // Restore UI elements
             _tocScrollView.animator.alphaValue = 1.0;
             _statusLabel.animator.alphaValue = 1.0;
-            _readingTimeLabel.animator.alphaValue = 1.0;
             
             // Update scroll indicators
             [self updateScrollIndicators];
@@ -2585,19 +2511,15 @@ extern "C" void showSimpleCommandPalette();
     // Get CPU usage
     _cpuUsage = [self getCurrentCPUUsage];
     
-    // Calculate reading time
-    NSString* readingTimeStr = [self calculateReadingTime];
-    
-    // Update the floating reading time label
-    [_readingTimeLabel setStringValue:readingTimeStr];
+    // Reading time calculation removed - no longer needed
+    // NSString* readingTimeStr = [self calculateReadingTime];
     
     // Format the status bar
     NSString* status = [NSString stringWithFormat:
-        @"[📄 %@ | %@ | %lu lines | %@] [Parse: %.0fms | Render: %.0fms | FPS: %.0f] [Memory: %@ | Cache: %.0f%%] [CPU: %.0f%%]",
+        @"[📄 %@ | %@ | %lu lines] [Parse: %.0fms | Render: %.0fms | FPS: %.0f] [Memory: %@ | Cache: %.0f%%] [CPU: %.0f%%]",
         filename,
         fileSizeStr, 
         (unsigned long)_currentLineCount,
-        readingTimeStr,
         _lastParseTime,
         _lastRenderTime,
         _currentFPS > 0 ? _currentFPS : 120.0, // Default to 120 if not measured
