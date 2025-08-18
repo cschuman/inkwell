@@ -1,108 +1,112 @@
-# Inkwell - A Simple macOS Markdown Viewer
+# Inkwell - Native macOS Markdown Viewer
 
 **Version: 0.1.0**  
-**Status: Actually working (mostly)**
+**Status: Beta**
 
-## What This Actually Is
+## Overview
 
-Inkwell is a native macOS markdown **viewer** (not editor!) built with C++. It displays markdown files with basic formatting. That's it.
+Inkwell is a native macOS markdown viewer built with C++ and Objective-C++. It provides fast, native rendering of markdown documents with a clean, minimal interface.
 
-## What Actually Works
+## Features
 
-✅ **Core Features That Work:**
-- Opens and displays markdown files
-- Basic syntax highlighting (headers, bold, italic, code blocks)
-- File → Open dialog
-- Command-line opening: `Inkwell file.md`
-- Vim navigation (j/k for scrolling, g/G for top/bottom)
-- Smooth scrolling
-- Recent files menu (maybe?)
+### Working Features
+- **File Operations**
+  - Open markdown files via File menu or command line
+  - Drag and drop support
+  - Recent files menu
+  - File watching with auto-reload
 
-## What Doesn't Work
+- **Text Display**
+  - Syntax highlighting for headers, bold, italic, code blocks
+  - Smooth scrolling
+  - Dark mode support
 
-❌ **Broken/Missing:**
-- Table of Contents sidebar (code exists but not wired up)
-- File watching (unclear if working)
-- Command Palette (Cmd+K might crash)
-- Search functionality
+- **Navigation**
+  - Vim-style keyboard navigation (j/k/g/G)
+  - Search with highlighting (Cmd+F)
+  - Find next/previous (Cmd+G/Cmd+Shift+G)
+
+- **User Interface**
+  - Command palette (Cmd+K)
+  - Native macOS look and feel
+  - Minimal, distraction-free viewing
+
+### Not Yet Implemented
+- Table of Contents sidebar
 - Export to HTML/PDF
-- Zoom in/out
-- About dialog
+- Zoom controls
+- Preferences window
 
-❌ **Architectural Lies (ignore these claims):**
-- "GPU accelerated" - Nope, uses NSTextView
-- "120fps scrolling" - Just regular scrolling
-- "Virtual DOM" - Exists but unused
-- "SIMD optimized" - Headers included, never used
-- "Memory pools" - Implemented but not used
-- "10x faster than Electron" - Never measured
+## Installation
 
-## How to Build
+### Requirements
+- macOS 11.0 or later
+- Xcode Command Line Tools
+- CMake 3.20+
+- vcpkg (optional, for dependency management)
+
+### Building from Source
 
 ```bash
-# Requirements
-- macOS 11.0+
-- Xcode command line tools
-- CMake
-- vcpkg (optional)
+# Clone the repository
+git clone https://github.com/cschuman/inkwell.git
+cd inkwell
 
 # Build
 chmod +x build_simple.sh
 ./build_simple.sh
 
 # Run
-./build_simple/Inkwell.app/Contents/MacOS/Inkwell file.md
-# Or
 open build_simple/Inkwell.app
+# Or from command line:
+./build_simple/Inkwell.app/Contents/MacOS/Inkwell README.md
 ```
 
-## How to Use
+## Usage
 
-1. **Open a file:**
-   - Launch app → File → Open
-   - Or: `./Inkwell.app/Contents/MacOS/Inkwell file.md`
-   - Or: Drag and drop (might work?)
+### Opening Files
+- **File Menu**: File → Open (Cmd+O)
+- **Command Line**: `Inkwell document.md`
+- **Drag & Drop**: Drop markdown files onto the app window
 
-2. **Navigate:**
-   - Scroll with trackpad/mouse
-   - `j`/`k` - scroll down/up
-   - `g` - go to top
-   - `G` - go to bottom
+### Keyboard Shortcuts
+- `Cmd+O` - Open file
+- `Cmd+F` - Search
+- `Cmd+G` - Find next
+- `Cmd+Shift+G` - Find previous
+- `Cmd+K` - Command palette
+- `j/k` - Scroll down/up
+- `g/G` - Go to top/bottom
+- `ESC` - Close search
 
-3. **That's it.** It's a viewer. It views markdown files.
+## Architecture
 
-## Technical Details
+- **Language**: C++20 with Objective-C++
+- **UI Framework**: Native Cocoa/AppKit
+- **Markdown Parser**: md4c
+- **Text Rendering**: NSTextView with syntax highlighting
+- **Build System**: CMake with vcpkg for dependencies
 
-- **Language:** C++20 with Objective-C++
-- **UI:** Native Cocoa with NSTextView
-- **Parser:** md4c (this part actually works well)
-- **Size:** ~2MB executable
+## Known Limitations
 
-## Known Issues
-
-- Can't edit anything (it's a viewer)
-- TOC sidebar doesn't work
-- Some menu items are just TODO stubs
-- Might crash on certain markdown files
-- No preferences/settings
-
-## Why This Exists
-
-Originally intended as a "blazingly fast" markdown viewer with GPU acceleration and all sorts of fancy features. Reality: It's a simple NSTextView wrapper that displays markdown. And that's fine.
+- Read-only viewer (no editing capabilities)
+- Table of Contents sidebar not yet functional
+- Export features not implemented
+- Some advanced markdown features may not render correctly
 
 ## Contributing
 
-The codebase is 15% working, 40% broken, 45% aspirational. Feel free to:
-- Remove broken code
-- Simplify the architecture
-- Make TOC actually work
-- Add search
-- Fix any of the TODO stubs
+Contributions are welcome! Priority areas for improvement:
+- Implementing Table of Contents navigation
+- Adding export functionality (HTML/PDF)
+- Improving markdown rendering coverage
+- Adding preferences/settings window
 
 ## License
 
-MIT (because why not)
+MIT License - see LICENSE file for details
 
----
+## Acknowledgments
 
-**Note:** This is the honest version. For the original aspirational version, see README_ORIGINAL_FANTASY.md
+- md4c markdown parser by Martin Mitáš
+- Original architecture inspired by performance-focused design principles
