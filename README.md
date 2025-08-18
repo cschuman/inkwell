@@ -1,147 +1,108 @@
-# Inkwell - High-Performance Native macOS Markdown Viewer
+# Inkwell - A Simple macOS Markdown Viewer
 
-A blazingly fast, native markdown viewer for macOS built with C++20 and Metal GPU acceleration.
+**Version: 0.1.0-unfucked**  
+**Status: Actually working (mostly)**
 
-## Features
+## What This Actually Is
 
-### Core Features
-- **Instant Preview**: Zero-latency rendering with virtual scrolling
-- **Focus Mode**: Immersive reading with elegant vignette overlay (Cmd+.)
-- **Smart TOC**: Floating, collapsible table of contents with instant navigation
-- **Live File Watching**: Auto-refresh with FSEvents monitoring
-- **Quick Look Integration**: Space bar preview in Finder
-- **Command Palette**: Quick actions and navigation (Cmd+K)
-- **Vim Navigation**: j/k for scrolling, gg/G for document navigation
-- **Reading Stats**: Word count and estimated reading time
-- **Export to PDF**: Native print/export functionality
+Inkwell is a native macOS markdown **viewer** (not editor!) built with C++. It displays markdown files with basic formatting. That's it.
 
-### Performance
-- **10x faster** file opening than Electron-based alternatives
-- **5x less memory usage** through custom memory allocators
-- **120fps scrolling** on M1 Macs with Metal acceleration
-- Handles **100MB+ markdown files** without performance degradation
+## What Actually Works
 
-## Architecture
+✅ **Core Features That Work:**
+- Opens and displays markdown files
+- Basic syntax highlighting (headers, bold, italic, code blocks)
+- File → Open dialog
+- Command-line opening: `Inkwell file.md`
+- Vim navigation (j/k for scrolling, g/G for top/bottom)
+- Smooth scrolling
+- Recent files menu (maybe?)
 
-### Technology Stack
-- **Core**: C++20 with custom memory management
-- **Parser**: md4c (fastest C markdown parser)
-- **Rendering**: Metal with GPU acceleration
-- **Platform**: Objective-C++ bridge for native macOS integration
-- **Typography**: Core Text with variable font support
+## What Doesn't Work
 
-### Key Components
-```
-Core Engine (C++):
-├── Streaming markdown parser with SIMD optimization
-├── Lock-free virtual DOM for efficient updates
-├── Custom memory pool allocators
-└── Multi-threaded rendering pipeline
+❌ **Broken/Missing:**
+- Table of Contents sidebar (code exists but not wired up)
+- File watching (unclear if working)
+- Command Palette (Cmd+K might crash)
+- Search functionality
+- Export to HTML/PDF
+- Zoom in/out
+- About dialog
 
-Platform Layer (Objective-C++):
-├── Native Cocoa integration
-├── FSEvents file watching
-├── Quick Look plugin
-└── Metal shader pipeline
-```
+❌ **Architectural Lies (ignore these claims):**
+- "GPU accelerated" - Nope, uses NSTextView
+- "120fps scrolling" - Just regular scrolling
+- "Virtual DOM" - Exists but unused
+- "SIMD optimized" - Headers included, never used
+- "Memory pools" - Implemented but not used
+- "10x faster than Electron" - Never measured
 
-## Installation
+## How to Build
 
-### Download Pre-built Binary
-Coming soon - check [Releases](https://github.com/cschuman/inkwell/releases)
-
-### Build from Source
-
-#### Requirements
+```bash
+# Requirements
 - macOS 11.0+
-- Xcode 13+ with C++20 support
-- CMake 3.20+
-- vcpkg package manager
-
-#### Build Instructions
-
-Quick build:
-```bash
-./build.sh
-```
-
-Or manually:
-```bash
-# Install dependencies
-vcpkg install
-
-# Configure with CMake
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+- Xcode command line tools
+- CMake
+- vcpkg (optional)
 
 # Build
-cmake --build build
+chmod +x build_simple.sh
+./build_simple.sh
 
-# Run tests
-ctest --test-dir build
-
-# Install to /Applications
-cmake --install build --prefix /Applications
+# Run
+./build_simple/Inkwell.app/Contents/MacOS/Inkwell file.md
+# Or
+open build_simple/Inkwell.app
 ```
 
-## Usage
+## How to Use
 
-### Keyboard Shortcuts
-- `Cmd+K`: Open command palette
-- `Cmd+.`: Toggle focus mode
-- `Cmd+P`: Print/Export to PDF
-- `j/k`: Scroll down/up (Vim style)
-- `h/l`: Scroll left/right
-- `gg`: Go to top (press g twice)
-- `G`: Go to bottom
+1. **Open a file:**
+   - Launch app → File → Open
+   - Or: `./Inkwell.app/Contents/MacOS/Inkwell file.md`
+   - Or: Drag and drop (might work?)
 
-### Command Line
-```bash
-# Open file
-Inkwell document.md
+2. **Navigate:**
+   - Scroll with trackpad/mouse
+   - `j`/`k` - scroll down/up
+   - `g` - go to top
+   - `G` - go to bottom
 
-# Quick Look preview
-qlmanage -p document.md
-```
+3. **That's it.** It's a viewer. It views markdown files.
 
-## Performance Benchmarks
+## Technical Details
 
-| Operation | Inkwell | Typical Electron App |
-|-----------|----------------|---------------------|
-| 10MB file open | 47ms | 520ms |
-| Memory usage (idle) | 35MB | 180MB |
-| Scroll FPS | 120fps | 30-60fps |
-| CPU usage (idle) | <1% | 5-15% |
+- **Language:** C++20 with Objective-C++
+- **UI:** Native Cocoa with NSTextView
+- **Parser:** md4c (this part actually works well)
+- **Size:** ~2MB executable
 
-## Development Roadmap
+## Known Issues
 
-### Phase 1 (Complete)
-- ✅ Core C++ rendering engine
-- ✅ md4c parser integration
-- ✅ Metal-accelerated rendering
-- ✅ File watching with FSEvents
-- ✅ Basic Quick Look plugin
+- Can't edit anything (it's a viewer)
+- TOC sidebar doesn't work
+- Some menu items are just TODO stubs
+- Might crash on certain markdown files
+- No preferences/settings
 
-### Phase 2 (Complete)
-- ✅ Reading statistics dashboard
-- ✅ Export to PDF
-- ✅ Focus Mode with vignette effects
-- ✅ Vim navigation keys
+## Why This Exists
 
-### Phase 3 (Planned)
-- [ ] Wiki-links with graph visualization
-- [ ] Plugin architecture
-- [ ] iCloud sync
-- [ ] Multi-window support
+Originally intended as a "blazingly fast" markdown viewer with GPU acceleration and all sorts of fancy features. Reality: It's a simple NSTextView wrapper that displays markdown. And that's fine.
 
 ## Contributing
 
-Contributions welcome! Please read our contributing guidelines and code of conduct.
+The codebase is 15% working, 40% broken, 45% aspirational. Feel free to:
+- Remove broken code
+- Simplify the architecture
+- Make TOC actually work
+- Add search
+- Fix any of the TODO stubs
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT (because why not)
 
-## Acknowledgments
+---
 
-- md4c parser by Martin Mitáš
-- Inspired by the need for a truly native, performant markdown viewer on macOS
+**Note:** This is the honest version. For the original fantasy version, see README.md
