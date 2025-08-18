@@ -9,8 +9,8 @@
 #define MDVIEWER_BUILD_DATE __DATE__
 #define MDVIEWER_BUILD_TIME __TIME__
 
-// Version string - HONEST VERSION (unfucked edition)
-#define MDVIEWER_VERSION_STRING "0.1.0-unfucked"
+// Version string
+#define MDVIEWER_VERSION_STRING "0.1.0"
 
 // Feature flags for this build
 #define FEATURE_COMMAND_PALETTE 1

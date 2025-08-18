@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Launching Inkwell v0.1.0-unfucked"
+echo "🚀 Launching Inkwell v0.1.0"
 echo "====================================="
 echo ""
 echo "✅ WORKING FEATURES:"
@@ -15,9 +15,9 @@ echo "  • Vim navigation (j/k to scroll)"
 echo "  • Command Palette (Cmd+K)"
 echo "  • Drag & drop"
 echo ""
-echo "Opening test_unfucked.md..."
+echo "Opening test_document.md..."
 echo "Press Ctrl+C to stop..."
 echo ""
 
 # Launch the app with the test file (command-line opening now works!)
-./build_simple/Inkwell.app/Contents/MacOS/Inkwell test_unfucked.md
+./build_simple/Inkwell.app/Contents/MacOS/Inkwell test_document.md

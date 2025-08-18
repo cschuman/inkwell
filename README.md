@@ -1,6 +1,6 @@
 # Inkwell - A Simple macOS Markdown Viewer
 
-**Version: 0.1.0-unfucked**  
+**Version: 0.1.0**  
 **Status: Actually working (mostly)**
 
 ## What This Actually Is
@@ -105,4 +105,4 @@ MIT (because why not)
 
 ---
 
-**Note:** This is the honest version. For the original fantasy version, see README.md
+**Note:** This is the honest version. For the original aspirational version, see README_ORIGINAL_FANTASY.md

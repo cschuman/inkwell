@@ -139,7 +139,7 @@ add_custom_command(
 add_custom_target(shaders ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shaders.metallib)
 add_dependencies(Inkwell shaders)
 
-# Tests - DISABLED FOR NOW (unfucking in progress)
+# Tests - DISABLED FOR NOW (cleanup in progress)
 # enable_testing()
 # 
 # add_executable(mdviewer_tests

@@ -1,4 +1,4 @@
-# Test Document - Is Inkwell Unfucked?
+# Test Document - Inkwell Functionality Check
 
 ## The Moment of Truth
 
@@ -28,4 +28,4 @@ function test() {
 - [ ] Code blocks are formatted
 - [ ] Lists work
 
-If you can read all of this, **we've successfully unfucked Inkwell!**
+If you can read all of this, **Inkwell is working correctly!**
