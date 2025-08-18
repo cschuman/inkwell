@@ -140,6 +140,9 @@ extern "C" void showSimpleCommandPalette();
 - (void)clearRecentFiles:(id)sender;
 - (void)updateRecentFilesMenu;
 - (void)addToRecentFiles:(NSString*)path;
+- (void)zoomIn:(id)sender;
+- (void)zoomOut:(id)sender;
+- (void)resetZoom:(id)sender;
 @end
 
 @implementation AppDelegate
@@ -217,7 +220,7 @@ extern "C" void showSimpleCommandPalette();
     NSMenu* appMenu = [[NSMenu alloc] init];
     [appMenuItem setSubmenu:appMenu];
     
-    NSString* aboutTitle = [NSString stringWithFormat:@"About Markdown Viewer (v%s)", 
+    NSString* aboutTitle = [NSString stringWithFormat:@"About Inkwell (v%s)", 
                            mdviewer::getVersionString()];
     NSMenuItem* aboutItem = [appMenu addItemWithTitle:aboutTitle
                                                 action:@selector(showAbout:) 
@@ -356,13 +359,33 @@ extern "C" void showSimpleCommandPalette();
     NSMenu* viewMenu = [[NSMenu alloc] initWithTitle:@"View"];
     [viewMenuItem setSubmenu:viewMenu];
     
+    // Zoom controls
+    NSMenuItem* zoomInItem = [viewMenu addItemWithTitle:@"Zoom In" 
+                                                  action:@selector(zoomIn:) 
+                                           keyEquivalent:@"+"];
+    [zoomInItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+    [zoomInItem setTarget:nil];
+    
+    NSMenuItem* zoomOutItem = [viewMenu addItemWithTitle:@"Zoom Out" 
+                                                   action:@selector(zoomOut:) 
+                                            keyEquivalent:@"-"];
+    [zoomOutItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+    [zoomOutItem setTarget:nil];
+    
+    NSMenuItem* resetZoomItem = [viewMenu addItemWithTitle:@"Reset Zoom" 
+                                                     action:@selector(resetZoom:) 
+                                              keyEquivalent:@"0"];
+    [resetZoomItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+    [resetZoomItem setTarget:nil];
+    
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    
+    // TOC and Focus mode
     NSMenuItem* tocItem = [viewMenu addItemWithTitle:@"Toggle Table of Contents" 
                                                action:@selector(toggleTOCSidebar) 
                                         keyEquivalent:@"t"];
     [tocItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
     [tocItem setTarget:nil];
-    
-    [viewMenu addItem:[NSMenuItem separatorItem]];
     
     NSMenuItem* focusItem = [viewMenu addItemWithTitle:@"Toggle Focus Mode" 
                                                  action:@selector(toggleFocusMode) 
@@ -398,26 +421,29 @@ extern "C" void showSimpleCommandPalette();
 
 - (void)showAbout:(id)sender {
     NSAlert* alert = [[NSAlert alloc] init];
-    [alert setMessageText:@"Markdown Viewer"];
+    [alert setMessageText:@"Inkwell"];
     
     NSString* info = [NSString stringWithFormat:
         @"Version: %s\n"
         @"Build: %d\n"
         @"Built: %s\n\n"
-        @"A high-performance native macOS Markdown viewer\n"
-        @"with Metal acceleration and command palette.\n\n"
-        @"Features:\n"
-        @"• Command Palette (Cmd+K)\n"
-        @"• Metal-accelerated rendering\n"
-        @"• Virtual DOM for efficient updates\n"
-        @"• Table of Contents sidebar\n"
-        @"• Dark/Light theme support",
+        @"A native macOS markdown viewer with a clean, minimal interface.\n\n"
+        @"Working Features:\n"
+        @"• Full-text search (Cmd+F)\n"
+        @"• Vim navigation (j/k/g/G)\n"
+        @"• File watching with auto-reload\n"
+        @"• Export to PDF and HTML\n"
+        @"• Command palette (Cmd+K)\n"
+        @"• Dark/Light theme support\n\n"
+        @"© 2024 Inkwell\n"
+        @"Licensed under MIT License",
         mdviewer::getVersionString(),
         mdviewer::getBuildNumber(),
         mdviewer::getBuildDate()];
     
     [alert setInformativeText:info];
     [alert addButtonWithTitle:@"OK"];
+    [alert setIcon:[NSImage imageNamed:NSImageNameInfo]];
     [alert runModal];
 }
 
@@ -437,6 +463,10 @@ extern "C" void showSimpleCommandPalette();
     NSOutlineView* _tocOutlineView;
     NSScrollView* _tocScrollView;
     NSMutableArray* _tocItems;
+    
+    // Font size management
+    CGFloat _currentFontSize;
+    CGFloat _baseFontSize;
     // Search UI
     NSView* _searchBar;
     NSSearchField* _searchField;
@@ -671,7 +701,12 @@ extern "C" void showSimpleCommandPalette();
     [(VimTextView*)_textView setMarkdownController:self];
     [_textView setEditable:NO];
     [_textView setSelectable:YES];
-    [_textView setFont:[NSFont systemFontOfSize:14]];
+    
+    // Initialize font size tracking
+    _baseFontSize = 14.0;
+    _currentFontSize = _baseFontSize;
+    [_textView setFont:[NSFont systemFontOfSize:_currentFontSize]];
+    
     [_textView setBackgroundColor:[NSColor textBackgroundColor]];
     [_textView setTextColor:[NSColor textColor]];
     [_textView setString:@"Ready - Use File → Open to load a markdown file"];
@@ -2340,6 +2375,53 @@ extern "C" void showSimpleCommandPalette();
     [[NSUserDefaults standardUserDefaults] setObject:_recentFiles forKey:@"RecentFiles"];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [self updateRecentFilesMenu];
+}
+
+// MARK: - Zoom Functions
+
+- (void)zoomIn:(id)sender {
+    _currentFontSize = MIN(_currentFontSize + 2.0, 48.0); // Max size 48
+    [self updateFontSize];
+}
+
+- (void)zoomOut:(id)sender {
+    _currentFontSize = MAX(_currentFontSize - 2.0, 8.0); // Min size 8
+    [self updateFontSize];
+}
+
+- (void)resetZoom:(id)sender {
+    _currentFontSize = _baseFontSize;
+    [self updateFontSize];
+}
+
+- (void)updateFontSize {
+    if (!_textView) return;
+    
+    // Update the font while preserving other attributes
+    NSFont* newFont = [NSFont systemFontOfSize:_currentFontSize];
+    
+    // Get current attributed string
+    NSMutableAttributedString* content = [[NSMutableAttributedString alloc] 
+        initWithAttributedString:[_textView textStorage]];
+    
+    // Update font throughout the document
+    [content enumerateAttribute:NSFontAttributeName 
+                        inRange:NSMakeRange(0, [content length]) 
+                        options:0 
+                     usingBlock:^(id value, NSRange range, BOOL* stop) {
+        if (value) {
+            NSFont* oldFont = (NSFont*)value;
+            NSFontDescriptor* descriptor = [oldFont fontDescriptor];
+            NSFont* scaledFont = [NSFont fontWithDescriptor:descriptor size:_currentFontSize];
+            [content addAttribute:NSFontAttributeName value:scaledFont range:range];
+        }
+    }];
+    
+    [[_textView textStorage] setAttributedString:content];
+    
+    // Update status with zoom level
+    NSInteger zoomPercent = (NSInteger)((_currentFontSize / _baseFontSize) * 100);
+    NSLog(@"Zoom: %ld%%", (long)zoomPercent);
 }
 
 // MARK: - Focus Mode
