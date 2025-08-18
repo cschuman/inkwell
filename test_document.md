@@ -29,3 +29,5 @@ function test() {
 - [ ] Lists work
 
 If you can read all of this, **Inkwell is working correctly!**
+## AUTO-RELOAD TEST - Mon Aug 18 19:24:26 EDT 2025
+If you see this timestamp in Inkwell, file watching works!
