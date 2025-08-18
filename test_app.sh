@@ -1,22 +1,23 @@
 #!/bin/bash
 
-# Quick test script to launch Inkwell with our test file
-
-echo "🚀 Launching Inkwell..."
-echo "========================"
+echo "🚀 Launching Inkwell v0.1.0-unfucked"
+echo "====================================="
 echo ""
-echo "MOMENT OF TRUTH: Can it display actual markdown text?"
+echo "✅ WORKING FEATURES:"
+echo "  ✓ Markdown rendering (real text!)"
+echo "  ✓ File → Open"
+echo "  ✓ Command-line file opening"
+echo "  ✓ Syntax highlighting"
+echo ""
+echo "🔍 TEST THESE:"
+echo "  • File watching (edit the file in another editor)"
+echo "  • Vim navigation (j/k to scroll)"
+echo "  • Command Palette (Cmd+K)"
+echo "  • Drag & drop"
 echo ""
 echo "Opening test_unfucked.md..."
-echo ""
-echo "Check if you see:"
-echo "  ✓ Actual text (not colored rectangles)"
-echo "  ✓ Formatted headers"
-echo "  ✓ Bold and italic text"
-echo "  ✓ Code blocks"
-echo ""
 echo "Press Ctrl+C to stop..."
 echo ""
 
-# Launch the app with the test file
-./Inkwell.app/Contents/MacOS/Inkwell test_unfucked.md
+# Launch the app with the test file (command-line opening now works!)
+./build_simple/Inkwell.app/Contents/MacOS/Inkwell test_unfucked.md

@@ -1083,6 +1083,20 @@ extern "C" void showSimpleCommandPalette();
     // Start FPS tracking
     [self startFPSTracking];
     
+    // Check if we have a file to open from command line
+    NSString* fileToOpen = [[NSUserDefaults standardUserDefaults] stringForKey:@"FileToOpenAtLaunch"];
+    if (fileToOpen) {
+        // Clear the flag
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"FileToOpenAtLaunch"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        
+        // Open the file after a short delay to ensure window is ready
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSLog(@"Opening command-line file: %@", fileToOpen);
+            [self openFile:fileToOpen];
+        });
+    }
+    
     // Update recent files menu on startup - delay to ensure menu is ready
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self updateRecentFilesMenu];
@@ -2685,12 +2699,37 @@ int main(int argc, char* argv[]) {
     @autoreleasepool {
         NSLog(@"Inkwell starting...");
         
+        // Check for command-line file argument
+        NSString* fileToOpen = nil;
+        if (argc > 1) {
+            fileToOpen = [NSString stringWithUTF8String:argv[1]];
+            NSLog(@"Command-line file specified: %@", fileToOpen);
+            
+            // Convert to absolute path if relative
+            if (![fileToOpen isAbsolutePath]) {
+                NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+                fileToOpen = [cwd stringByAppendingPathComponent:fileToOpen];
+            }
+            
+            // Check if file exists
+            if (![[NSFileManager defaultManager] fileExistsAtPath:fileToOpen]) {
+                NSLog(@"Error: File not found: %@", fileToOpen);
+                fileToOpen = nil;
+            }
+        }
+        
         @try {
             NSApplication* app = [NSApplication sharedApplication];
             NSLog(@"NSApplication created");
             
             AppDelegate* delegate = [[AppDelegate alloc] init];
             NSLog(@"AppDelegate created");
+            
+            // Store the file path to open after window is ready
+            if (fileToOpen) {
+                [[NSUserDefaults standardUserDefaults] setObject:fileToOpen forKey:@"FileToOpenAtLaunch"];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+            }
             
             [app setDelegate:delegate];
             NSLog(@"Delegate set");
