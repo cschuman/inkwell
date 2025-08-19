@@ -718,7 +718,8 @@ extern "C" void showSimpleCommandPalette();
     [_tocOutlineView setDataSource:self];
     [_tocOutlineView setDelegate:self];
     [_tocOutlineView setTarget:self];
-    [_tocOutlineView setDoubleAction:@selector(tocItemDoubleClicked:)];
+    [_tocOutlineView setAction:@selector(tocItemClicked:)];  // Single click
+    [_tocOutlineView setDoubleAction:@selector(tocItemClicked:)];  // Also handle double click
     
     [_tocScrollView setDocumentView:_tocOutlineView];
     
@@ -2003,21 +2004,46 @@ extern "C" void showSimpleCommandPalette();
     }
 }
 
-- (void)tocItemDoubleClicked:(id)sender {
-    TOCItem* item = [_tocOutlineView itemAtRow:[_tocOutlineView clickedRow]];
-    if (item) {
-        // Find the heading in the text and scroll to it
-        NSString* searchText = item.title;
+- (void)tocItemClicked:(id)sender {
+    NSInteger clickedRow = [_tocOutlineView clickedRow];
+    if (clickedRow < 0) return;  // No row clicked
+    
+    TOCItem* item = [_tocOutlineView itemAtRow:clickedRow];
+    if (item && item.title) {
+        // Build the heading pattern to search for (with # prefix)
+        NSMutableString* headingPattern = [NSMutableString string];
+        
+        // Add the appropriate number of # symbols
+        for (NSInteger i = 0; i < item.level; i++) {
+            [headingPattern appendString:@"#"];
+        }
+        [headingPattern appendString:@" "];
+        [headingPattern appendString:item.title];
+        
         NSString* content = [[_textView textStorage] string];
         
-        NSRange searchRange = [content rangeOfString:searchText 
+        // First try to find the exact heading with # prefix
+        NSRange searchRange = [content rangeOfString:headingPattern 
                                              options:NSCaseInsensitiveSearch];
         
+        // If not found, fall back to searching just the title
+        if (searchRange.location == NSNotFound) {
+            searchRange = [content rangeOfString:item.title 
+                                         options:NSCaseInsensitiveSearch];
+        }
+        
         if (searchRange.location != NSNotFound) {
+            // Scroll to the heading
             [_textView scrollRangeToVisible:searchRange];
             
-            // Optionally highlight the heading briefly
+            // Select the heading to highlight it briefly
             [_textView setSelectedRange:searchRange];
+            
+            // Flash the selection
+            [_textView showFindIndicatorForRange:searchRange];
+            
+            // Make text view first responder so user can immediately navigate
+            [[self.view window] makeFirstResponder:_textView];
         }
     }
 }
