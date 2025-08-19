@@ -515,8 +515,8 @@ extern "C" void showSimpleCommandPalette();
         // _renderEngine = std::make_unique<mdviewer::RenderEngine>();  // Commented out for now
         _fileWatcher = std::make_unique<mdviewer::FileWatcher>();
         
-        // Initialize search arrays
-        _searchResults = [NSMutableArray array];
+        // Initialize search arrays with retained instance
+        _searchResults = [[NSMutableArray alloc] init];
         _currentSearchIndex = -1;
         
         // Initialize TOC items
@@ -559,7 +559,10 @@ extern "C" void showSimpleCommandPalette();
     [self stopFPSTracking];
     [_navigationHistory release];
     [_recentFiles release];
-    [_searchResults release];
+    if (_searchResults) {
+        [_searchResults release];
+        _searchResults = nil;
+    }
     [_tocItems release];
     [super dealloc];
 }
@@ -1329,8 +1332,12 @@ extern "C" void showSimpleCommandPalette();
     // Focus on search field
     [_searchField becomeFirstResponder];
     
-    // Initialize search
-    _searchResults = [NSMutableArray array];
+    // Initialize search with retained instance
+    if (_searchResults) {
+        [_searchResults removeAllObjects];
+    } else {
+        _searchResults = [[NSMutableArray alloc] init];
+    }
     _currentSearchIndex = -1;
 }
 
@@ -1361,11 +1368,11 @@ extern "C" void showSimpleCommandPalette();
     scrollFrame.size.height = self.view.frame.size.height - 22; // just status bar
     [_scrollView setFrame:scrollFrame];
     
-    // Clear highlights
+    // Clear highlights before clearing the array
     [self clearSearchHighlights];
     
-    // Clear search state
-    _searchResults = nil;
+    // Clear search state - reset to empty array instead of nil for safety
+    _searchResults = [NSMutableArray array];
     _currentSearchIndex = -1;
     [_searchResultLabel setStringValue:@""];
 }
@@ -1378,7 +1385,7 @@ extern "C" void showSimpleCommandPalette();
         } else {
             [self clearSearchHighlights];
             if (!_searchResults) {
-                _searchResults = [NSMutableArray array];
+                _searchResults = [[NSMutableArray alloc] init];
             } else {
                 [_searchResults removeAllObjects];
             }
@@ -1399,7 +1406,7 @@ extern "C" void showSimpleCommandPalette();
     [self incrementFrameCount];
     
     if (!_searchResults) {
-        _searchResults = [NSMutableArray array];
+        _searchResults = [[NSMutableArray alloc] init];
     } else {
         [_searchResults removeAllObjects];
     }
@@ -1496,54 +1503,43 @@ extern "C" void showSimpleCommandPalette();
 - (void)clearSearchHighlights {
     // Don't remove all background attributes as it will remove code block backgrounds
     // Instead, only remove search highlight colors
-    @try {
-        // Simple nil check without isKindOfClass
-        if (!_searchResults) {
-            _searchResults = [NSMutableArray array];
-            return;
-        }
-        
-        NSUInteger count = 0;
-        @try {
-            count = [_searchResults count];
-        } @catch (NSException* e) {
-            _searchResults = [NSMutableArray array];
-            return;
-        }
-        
-        if (count == 0) return;
-        
-        // Check textView is valid
-        if (!_textView || !_textView.textStorage) return;
-        
-        NSTextStorage* textStorage = [_textView textStorage];
-        NSString* textString = [textStorage string];
-        if (!textString) return;
-        
-        NSUInteger textLength = [textString length];
-        if (textLength == 0) return;
-        
-        // Iterate through results directly
-        for (NSUInteger i = 0; i < count; i++) {
-            @try {
-                id obj = [_searchResults objectAtIndex:i];
-                if (!obj || ![obj respondsToSelector:@selector(rangeValue)]) continue;
-                
-                NSRange range = [(NSValue*)obj rangeValue];
-                
-                if (range.location != NSNotFound && 
-                    range.location < textLength && 
-                    NSMaxRange(range) <= textLength) {
-                    [textStorage removeAttribute:NSBackgroundColorAttributeName range:range];
-                }
-            } @catch (NSException* e) {
-                // Skip this item
-                continue;
-            }
-        }
-    } @catch (NSException* exception) {
-        NSLog(@"Error clearing search highlights: %@", exception);
+    
+    // Ensure _searchResults is always a valid array
+    if (!_searchResults || ![_searchResults isKindOfClass:[NSArray class]]) {
         _searchResults = [NSMutableArray array];
+        return;
+    }
+    
+    // Early return if no results to clear
+    if ([_searchResults count] == 0) return;
+    
+    // Check textView is valid
+    if (!_textView || !_textView.textStorage) return;
+    
+    NSTextStorage* textStorage = [_textView textStorage];
+    NSString* textString = [textStorage string];
+    if (!textString || [textString length] == 0) return;
+    
+    NSUInteger textLength = [textString length];
+    
+    // Create a copy to avoid mutation during iteration
+    NSArray* resultsCopy = [_searchResults copy];
+    
+    // Safely iterate through results
+    for (id obj in resultsCopy) {
+        // Skip non-NSValue objects
+        if (![obj isKindOfClass:[NSValue class]]) continue;
+        
+        NSValue* value = (NSValue*)obj;
+        NSRange range = [value rangeValue];
+        
+        // Validate range
+        if (range.location == NSNotFound) continue;
+        if (range.location >= textLength) continue;
+        if (NSMaxRange(range) > textLength) continue;
+        
+        // Remove highlight
+        [textStorage removeAttribute:NSBackgroundColorAttributeName range:range];
     }
 }
 
