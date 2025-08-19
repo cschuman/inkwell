@@ -1,16 +1,16 @@
 #pragma once
 
 #define MDVIEWER_VERSION_MAJOR 0
-#define MDVIEWER_VERSION_MINOR 1
+#define MDVIEWER_VERSION_MINOR 2
 #define MDVIEWER_VERSION_PATCH 0
-#define MDVIEWER_BUILD_NUMBER 1
+#define MDVIEWER_BUILD_NUMBER 2
 
 // Build timestamp - will be updated by build script
 #define MDVIEWER_BUILD_DATE __DATE__
 #define MDVIEWER_BUILD_TIME __TIME__
 
 // Version string
-#define MDVIEWER_VERSION_STRING "0.1.0"
+#define MDVIEWER_VERSION_STRING "0.2.0"
 
 // Feature flags for this build
 #define FEATURE_COMMAND_PALETTE 1
