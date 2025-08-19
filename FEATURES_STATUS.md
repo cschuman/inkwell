@@ -6,6 +6,12 @@
 - **Markdown rendering** - Displays real formatted text with NSTextView
 - **File opening** - File → Open dialog works perfectly
 - **Command-line opening** - `Inkwell file.md` works
+- **Drag & Drop** - FULLY WORKING!
+  - Drag files onto window to open
+  - Drag files onto app icon (Dock) to open
+  - Visual feedback during drag
+  - Supports multiple markdown extensions
+  - Alerts user when multiple files are dropped
 - **Vim navigation** - j/k/g/G confirmed working
 - **Search (Cmd+F)** - FULLY IMPLEMENTED AND FIXED!
   - Search bar slides down with animation
@@ -35,7 +41,6 @@
 
 ### Likely Working (Need User Confirmation):
 - **File watching** - Code runs, needs visual confirmation
-- **Drag & drop** - Registered for file drops
 - **Recent files menu** - Code exists
 
 ## ❌ Features That DON'T Work
@@ -70,6 +75,11 @@ We discovered that many features were **already implemented but not documented**
 2. Test Command Palette thoroughly
 3. Wire up TOC sidebar (parser works, UI exists)
 4. Add Export to PDF (macOS makes this easy)
+
+## Project Planning
+
+- **[ROADMAP.md](./ROADMAP.md)** - Development timeline and version planning
+- **[FEATURE_BACKLOG.md](./FEATURE_BACKLOG.md)** - Complete wishlist of potential features
 
 ---
 

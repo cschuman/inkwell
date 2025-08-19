@@ -44,13 +44,34 @@ extern "C" void showSimpleCommandPalette();
 // Forward declaration
 @class MarkdownViewController;
 
-@interface KeyHandlingView : NSView
+@interface KeyHandlingView : NSView <NSDraggingDestination>
 @property (assign) NSViewController* controller;
 @end
 
 @implementation KeyHandlingView
 - (BOOL)acceptsFirstResponder {
     return YES;
+}
+
+// Forward drag operations to controller
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+    if ([self.controller respondsToSelector:@selector(draggingEntered:)]) {
+        return [(id)self.controller draggingEntered:sender];
+    }
+    return NSDragOperationNone;
+}
+
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+    if ([self.controller respondsToSelector:@selector(draggingExited:)]) {
+        [(id)self.controller draggingExited:sender];
+    }
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    if ([self.controller respondsToSelector:@selector(performDragOperation:)]) {
+        return [(id)self.controller performDragOperation:sender];
+    }
+    return NO;
 }
 
 - (void)keyDown:(NSEvent*)event {
@@ -525,6 +546,8 @@ extern "C" void showSimpleCommandPalette();
     NSTextField* _searchResultLabel;
     NSMutableArray* _searchResults;
     NSInteger _currentSearchIndex;
+    // Drag and drop visual feedback
+    NSView* _dragHighlightView;
     // id<MTLDevice> _device;  // Commented out for now
     // id<MTLCommandQueue> _commandQueue;  // Commented out for now
     std::unique_ptr<mdviewer::MarkdownParser> _parser;
@@ -2109,16 +2132,33 @@ extern "C" void showSimpleCommandPalette();
 
 // MARK: - Drag and Drop Support
 
+- (BOOL)isMarkdownFile:(NSString*)pathExtension {
+    NSArray* supportedExtensions = @[
+        @"md", @"markdown", @"mdown", @"mkd", 
+        @"mdwn", @"mkdn", @"mdtxt", @"mdtext", 
+        @"text", @"txt"
+    ];
+    return [supportedExtensions containsObject:[pathExtension lowercaseString]];
+}
+
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
     NSPasteboard* pasteboard = [sender draggingPasteboard];
     
     if ([pasteboard canReadObjectForClasses:@[[NSURL class]] options:nil]) {
         NSArray* urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
         for (NSURL* url in urls) {
-            NSString* pathExtension = [[url pathExtension] lowercaseString];
-            if ([pathExtension isEqualToString:@"md"] || 
-                [pathExtension isEqualToString:@"markdown"] || 
-                [pathExtension isEqualToString:@"txt"]) {
+            if ([self isMarkdownFile:[url pathExtension]]) {
+                // Provide visual feedback - add a highlight overlay
+                if (!_dragHighlightView) {
+                    _dragHighlightView = [[NSView alloc] initWithFrame:self.view.bounds];
+                    _dragHighlightView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+                    _dragHighlightView.wantsLayer = YES;
+                    _dragHighlightView.layer.backgroundColor = [[NSColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:0.1] CGColor];
+                    _dragHighlightView.layer.borderColor = [[NSColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:0.5] CGColor];
+                    _dragHighlightView.layer.borderWidth = 3.0;
+                    _dragHighlightView.layer.cornerRadius = 8.0;
+                }
+                [self.view addSubview:_dragHighlightView positioned:NSWindowAbove relativeTo:nil];
                 return NSDragOperationCopy;
             }
         }
@@ -2127,17 +2167,36 @@ extern "C" void showSimpleCommandPalette();
     return NSDragOperationNone;
 }
 
+- (void)draggingExited:(id<NSDraggingInfo>)sender {
+    // Reset visual feedback
+    [_dragHighlightView removeFromSuperview];
+}
+
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+    // Reset visual feedback
+    [_dragHighlightView removeFromSuperview];
+    
     NSPasteboard* pasteboard = [sender draggingPasteboard];
     NSArray* urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
     
     if ([urls count] > 0) {
         NSURL* url = [urls firstObject];
-        NSString* pathExtension = [[url pathExtension] lowercaseString];
-        if ([pathExtension isEqualToString:@"md"] || 
-            [pathExtension isEqualToString:@"markdown"] || 
-            [pathExtension isEqualToString:@"txt"]) {
+        if ([self isMarkdownFile:[url pathExtension]]) {
+            // Log for debugging
+            NSLog(@"Opening dropped file: %@", [url path]);
             [self openFile:[url path]];
+            
+            // If multiple files were dropped, inform user
+            if ([urls count] > 1) {
+                NSAlert* alert = [[NSAlert alloc] init];
+                [alert setMessageText:@"Multiple Files"];
+                [alert setInformativeText:[NSString stringWithFormat:@"Opened first file. %lu additional files were not opened.", (unsigned long)[urls count] - 1]];
+                [alert addButtonWithTitle:@"OK"];
+                [alert setAlertStyle:NSAlertStyleInformational];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [alert runModal];
+                });
+            }
             return YES;
         }
     }
