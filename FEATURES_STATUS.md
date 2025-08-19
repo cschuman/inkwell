@@ -2,33 +2,46 @@
 
 ## ✅ Features That ACTUALLY WORK
 
-### Confirmed Working:
-- **Markdown rendering** - Displays real formatted text
-- **File opening** - File → Open dialog works
+### Fully Functional:
+- **Markdown rendering** - Displays real formatted text with NSTextView
+- **File opening** - File → Open dialog works perfectly
 - **Command-line opening** - `Inkwell file.md` works
 - **Vim navigation** - j/k/g/G confirmed working
-- **Search (Cmd+F)** - FULLY IMPLEMENTED!
-  - Search bar slides down
-  - Highlights matches
-  - Next/Previous navigation
-  - Cmd+G/Cmd+Shift+G shortcuts
+- **Search (Cmd+F)** - FULLY IMPLEMENTED AND FIXED!
+  - Search bar slides down with animation
+  - Highlights all matches
+  - Next/Previous navigation (Cmd+G/Cmd+Shift+G)
   - ESC to close
+  - Fixed crash on rapid open/close
 - **Syntax highlighting** - Headers, bold, italic, code blocks
+- **Table of Contents (Cmd+Option+T)** - NOW WORKING!
+  - Shows document structure in sidebar
+  - Toggleable via shortcut or Command Palette
+  - Click items to navigate (in progress)
+- **Command Palette (Cmd+K)** - CONFIRMED WORKING!
+  - Fuzzy search for commands
+  - Shows keyboard shortcuts
+  - Executes selected commands
+- **Export to PDF (Cmd+Shift+E)** - WORKING!
+- **Export to HTML** - WORKING!
+- **Zoom controls** - WORKING!
+  - Zoom In (Cmd++)
+  - Zoom Out (Cmd+-)
+  - Reset Zoom (Cmd+0)
+- **About dialog** - WORKING with version info
+- **Window persistence** - WORKING!
+  - Remembers window size and position
+  - Restores on launch
 
 ### Likely Working (Need User Confirmation):
 - **File watching** - Code runs, needs visual confirmation
-- **Command Palette (Cmd+K)** - Code exists, may work
 - **Drag & drop** - Registered for file drops
 - **Recent files menu** - Code exists
 
 ## ❌ Features That DON'T Work
 
-### Confirmed Broken:
-- **TOC sidebar** - Not wired up
-- **Save/Save As** - TODO stubs (but it's a viewer!)
-- **Export HTML/PDF** - TODO stubs
-- **Zoom in/out** - TODO stubs
-- **About dialog** - TODO stub
+### Not Applicable (It's a viewer!):
+- **Save/Save As** - Not needed for a viewer
 
 ### Architectural Fiction:
 - **GPU acceleration** - Using NSTextView

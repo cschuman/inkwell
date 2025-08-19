@@ -31,11 +31,17 @@ Inkwell is a native macOS markdown viewer built with C++ and Objective-C++. It p
   - Native macOS look and feel
   - Minimal, distraction-free viewing
 
+### Additional Features
+- Table of Contents sidebar (Cmd+Option+T)
+- Export to HTML/PDF (Cmd+Shift+E)
+- Zoom controls (Cmd++/Cmd+-/Cmd+0)
+- Window position/size persistence
+- Command palette with fuzzy search (Cmd+K)
+
 ### Not Yet Implemented
-- Table of Contents sidebar
-- Export to HTML/PDF
-- Zoom controls
 - Preferences window
+- TOC item click navigation
+- Themes customization
 
 ## Installation
 
