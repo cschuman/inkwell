@@ -1091,6 +1091,9 @@ extern "C" void showSimpleCommandPalette();
     }
     _lastRenderTime = -[renderStart timeIntervalSinceNow] * 1000; // Convert to milliseconds
     
+    // Build Table of Contents from the parsed document
+    [self buildTOCFromDocument];
+    
     // Update comprehensive status bar
     [self updateStatusBar];
     
