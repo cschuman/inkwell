@@ -14,12 +14,14 @@
 // Simple command palette function
 extern "C" void showSimpleCommandPalette();
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property (strong) NSWindow* window;
 @property (strong) NSViewController* mainViewController;
 - (void)createMenuBar;
 - (void)openDocument:(id)sender;
 - (void)showCommandPalette:(id)sender;
+- (void)saveWindowFrame;
+- (void)restoreWindowFrame;
 @end
 
 @interface TOCItem : NSObject
@@ -168,7 +170,12 @@ extern "C" void showSimpleCommandPalette();
                        mdviewer::getVersionString(), 
                        mdviewer::getBuildNumber()];
     [self.window setTitle:title];
-    [self.window center];
+    
+    // Set window delegate for position persistence
+    [self.window setDelegate:self];
+    
+    // Restore window position/size from user defaults
+    [self restoreWindowFrame];
     
     // Log version info
     NSLog(@"Inkwell Version: %s", mdviewer::getVersionString());
@@ -445,6 +452,49 @@ extern "C" void showSimpleCommandPalette();
     [alert addButtonWithTitle:@"OK"];
     [alert setIcon:[NSImage imageNamed:NSImageNameInfo]];
     [alert runModal];
+}
+
+- (void)saveWindowFrame {
+    NSString* frameString = NSStringFromRect(self.window.frame);
+    [[NSUserDefaults standardUserDefaults] setObject:frameString forKey:@"InkwellWindowFrame"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)restoreWindowFrame {
+    NSString* frameString = [[NSUserDefaults standardUserDefaults] stringForKey:@"InkwellWindowFrame"];
+    if (frameString) {
+        NSRect frame = NSRectFromString(frameString);
+        // Verify the frame is visible on at least one screen
+        BOOL isVisible = NO;
+        for (NSScreen* screen in [NSScreen screens]) {
+            if (NSIntersectsRect(frame, screen.frame)) {
+                isVisible = YES;
+                break;
+            }
+        }
+        
+        if (isVisible) {
+            [self.window setFrame:frame display:NO];
+        } else {
+            // If not visible, center the window
+            [self.window center];
+        }
+    } else {
+        [self.window center];
+    }
+}
+
+// NSWindowDelegate methods
+- (void)windowDidMove:(NSNotification*)notification {
+    [self saveWindowFrame];
+}
+
+- (void)windowDidResize:(NSNotification*)notification {
+    [self saveWindowFrame];
+}
+
+- (void)windowWillClose:(NSNotification*)notification {
+    [self saveWindowFrame];
 }
 
 @end
