@@ -722,8 +722,8 @@ extern "C" void showSimpleCommandPalette();
     
     [_tocScrollView setDocumentView:_tocOutlineView];
     
-    // Initially hide TOC
-    [_tocScrollView setHidden:YES];
+    // Don't hide TOC with setHidden - control visibility with split position
+    // [_tocScrollView setHidden:YES];  // Removed - causes issues with split view
     
     // Create main content scroll view  
     NSRect scrollFrame = NSMakeRect(0, 0, frame.size.width, splitFrame.size.height);
@@ -1969,19 +1969,9 @@ extern "C" void showSimpleCommandPalette();
                 
                 item.title = title;
                 
-                // Find appropriate parent based on level
-                if ([items count] > 0) {
-                    TOCItem* lastItem = [items lastObject];
-                    if (lastItem.level < item.level) {
-                        // This is a child of the last item
-                        [lastItem.children addObject:item];
-                    } else {
-                        // Find the right level to add this item
-                        [items addObject:item];
-                    }
-                } else {
-                    [items addObject:item];
-                }
+                // For now, just add all items at the top level
+                // We can implement hierarchy later
+                [items addObject:item];
             }
             
             // Recursively process children
@@ -1998,16 +1988,17 @@ extern "C" void showSimpleCommandPalette();
 }
 
 - (void)toggleTOCSidebar {
-    if ([_tocScrollView isHidden]) {
+    // Check if TOC is visible by checking the frame width
+    NSRect tocFrame = [_tocScrollView frame];
+    
+    if (tocFrame.size.width < 10) {  // TOC is hidden
         // Show TOC
-        [_tocScrollView setHidden:NO];
         [_splitView setPosition:200 ofDividerAtIndex:0];
         
         // Build/refresh TOC
         [self buildTOCFromDocument];
     } else {
         // Hide TOC
-        [_tocScrollView setHidden:YES];
         [_splitView setPosition:0 ofDividerAtIndex:0];
     }
 }
