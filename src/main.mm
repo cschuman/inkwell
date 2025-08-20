@@ -26,37 +26,58 @@ extern "C" void showSimpleCommandPalette();
 @end
 
 @interface TOCItem : NSObject
-@property (strong) NSString* title;
-@property (assign) NSInteger level;
-@property (strong) NSMutableArray<TOCItem*>* children;
-@property (assign) NSRange range;
+@property (retain, nonatomic) NSString* title;
+@property (assign, nonatomic) NSInteger level;
+@property (retain, nonatomic) NSMutableArray<TOCItem*>* children;
+@property (assign, nonatomic) NSRange range;
 @end
 
 @implementation TOCItem
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _children = [NSMutableArray array];
+        _children = [[NSMutableArray alloc] init];
+        _title = nil;
+        _level = 0;
+        _range = NSMakeRange(0, 0);
     }
     return self;
+}
+
+- (void)dealloc {
+    [_title release];
+    [_children release];
+    [super dealloc];
 }
 @end
 
 @interface FileItem : NSObject
-@property (strong) NSString* name;
-@property (strong) NSString* path;
-@property (assign) BOOL isDirectory;
-@property (strong) NSMutableArray<FileItem*>* children;
-@property (strong) NSImage* icon;
+@property (retain, nonatomic) NSString* name;
+@property (retain, nonatomic) NSString* path;
+@property (assign, nonatomic) BOOL isDirectory;
+@property (retain, nonatomic) NSMutableArray<FileItem*>* children;
+@property (retain, nonatomic) NSImage* icon;
 @end
 
 @implementation FileItem
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _children = [NSMutableArray array];
+        _children = [[NSMutableArray alloc] init];
+        _name = nil;
+        _path = nil;
+        _isDirectory = NO;
+        _icon = nil;
     }
     return self;
+}
+
+- (void)dealloc {
+    [_name release];
+    [_path release];
+    [_children release];
+    [_icon release];
+    [super dealloc];
 }
 @end
 
@@ -2506,8 +2527,11 @@ extern "C" void showSimpleCommandPalette();
     
     NSLog(@"Building file tree for folder: %@", folderPath);
     
-    // Clear and create new array
-    _fileItems = [NSMutableArray array];
+    // Clear and create new array (retained)
+    if (_fileItems) {
+        [_fileItems release];
+    }
+    _fileItems = [[NSMutableArray array] retain];
     
     NSFileManager* fm = [NSFileManager defaultManager];
     
