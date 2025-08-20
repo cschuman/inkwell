@@ -2505,27 +2505,26 @@ extern "C" void showSimpleCommandPalette();
     }
     
     NSLog(@"Building file tree for folder: %@", folderPath);
-    _fileItems = [NSMutableArray array];
+    
+    // Clear and retain the new array
+    if (_fileItems) {
+        [_fileItems release];
+    }
+    _fileItems = [[NSMutableArray alloc] init];
     
     NSFileManager* fm = [NSFileManager defaultManager];
-    NSError* error = nil;
     
-    // Create root item for the folder
-    FileItem* rootItem = [[FileItem alloc] init];
-    rootItem.name = [folderPath lastPathComponent];
-    rootItem.path = folderPath;
-    rootItem.isDirectory = YES;
+    // Instead of creating a root item, scan directory directly into _fileItems
+    [self scanDirectory:folderPath intoArray:_fileItems withDepth:0];
     
-    // Scan directory
-    [self scanDirectory:folderPath intoItem:rootItem];
-    
-    [_fileItems addObject:rootItem];
-    NSLog(@"File tree built with %lu items", (unsigned long)[rootItem.children count]);
+    NSLog(@"File tree built with %lu items", (unsigned long)[_fileItems count]);
     [_fileOutlineView reloadData];
-    [_fileOutlineView expandItem:rootItem];
 }
 
-- (void)scanDirectory:(NSString*)path intoItem:(FileItem*)parentItem {
+- (void)scanDirectory:(NSString*)path intoArray:(NSMutableArray*)array withDepth:(NSInteger)depth {
+    // Don't scan too deep
+    if (depth > 2) return;
+    
     NSFileManager* fm = [NSFileManager defaultManager];
     NSError* error = nil;
     NSArray* contents = [fm contentsOfDirectoryAtPath:path error:&error];
@@ -2564,20 +2563,88 @@ extern "C" void showSimpleCommandPalette();
         item.isDirectory = isDirectory;
         
         if (isDirectory) {
-            // Only scan subdirectories one level deep for performance
             item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:NSFileTypeForHFSTypeCode(kGenericFolderIcon)];
-            // Don't recursively scan for now - can be expanded on demand
+            // Recursively scan subdirectories
+            [self scanDirectory:itemPath intoItem:item withDepth:depth + 1];
         } else {
             // Only include markdown files
             NSString* extension = [[itemName pathExtension] lowercaseString];
             NSArray* markdownExtensions = @[@"md", @"markdown", @"mdown", @"mkd", @"mdwn"];
             
-            if (![markdownExtensions containsObject:extension]) continue;
+            if (![markdownExtensions containsObject:extension]) {
+                [item release];
+                continue;
+            }
             
             item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:extension];
         }
         
+        [array addObject:item];
+        [item release]; // Array retains it
+    }
+}
+
+- (void)scanDirectory:(NSString*)path intoItem:(FileItem*)parentItem withDepth:(NSInteger)depth {
+    // Don't scan too deep
+    if (depth > 2) return;
+    
+    NSFileManager* fm = [NSFileManager defaultManager];
+    NSError* error = nil;
+    NSArray* contents = [fm contentsOfDirectoryAtPath:path error:&error];
+    
+    if (error) {
+        NSLog(@"Error scanning directory %@: %@", path, error);
+        return;
+    }
+    
+    // Sort contents alphabetically, directories first
+    NSArray* sortedContents = [contents sortedArrayUsingComparator:^NSComparisonResult(NSString* obj1, NSString* obj2) {
+        NSString* path1 = [path stringByAppendingPathComponent:obj1];
+        NSString* path2 = [path stringByAppendingPathComponent:obj2];
+        
+        BOOL isDir1, isDir2;
+        [fm fileExistsAtPath:path1 isDirectory:&isDir1];
+        [fm fileExistsAtPath:path2 isDirectory:&isDir2];
+        
+        if (isDir1 && !isDir2) return NSOrderedAscending;
+        if (!isDir1 && isDir2) return NSOrderedDescending;
+        
+        return [obj1 localizedStandardCompare:obj2];
+    }];
+    
+    for (NSString* itemName in sortedContents) {
+        // Skip hidden files
+        if ([itemName hasPrefix:@"."]) continue;
+        
+        NSString* itemPath = [path stringByAppendingPathComponent:itemName];
+        BOOL isDirectory;
+        [fm fileExistsAtPath:itemPath isDirectory:&isDirectory];
+        
+        FileItem* item = [[FileItem alloc] init];
+        item.name = itemName;
+        item.path = itemPath;
+        item.isDirectory = isDirectory;
+        
+        if (isDirectory) {
+            item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:NSFileTypeForHFSTypeCode(kGenericFolderIcon)];
+            // Recursively scan subdirectories
+            [self scanDirectory:itemPath intoItem:item withDepth:depth + 1];
+        } else {
+            // Only include markdown files
+            NSString* extension = [[itemName pathExtension] lowercaseString];
+            NSArray* markdownExtensions = @[@"md", @"markdown", @"mdown", @"mkd", @"mdwn"];
+            
+            if (![markdownExtensions containsObject:extension]) {
+                [item release];
+                continue;
+            }
+            
+            item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:extension];
+        }
+        
+        // Retain the item before adding to parent
         [parentItem.children addObject:item];
+        [item release]; // Parent's array retains it
     }
 }
 
@@ -2595,7 +2662,7 @@ extern "C" void showSimpleCommandPalette();
         } else {
             // Scan directory if not already done
             if ([item.children count] == 0) {
-                [self scanDirectory:item.path intoItem:item];
+                [self scanDirectory:item.path intoItem:item withDepth:0];
                 [_fileOutlineView reloadItem:item reloadChildren:YES];
             }
             [_fileOutlineView expandItem:item];
