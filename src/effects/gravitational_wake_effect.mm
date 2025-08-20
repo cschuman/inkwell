@@ -161,6 +161,9 @@
         self.warpField.endPoint = CGPointMake(1.0, 1.0);
         [self.overlayView.layer addSublayer:self.warpField];
         
+        // Setup grid BEFORE creating distortion mesh
+        [self setupGrid];
+        
         // Create distortion mesh
         [self createDistortionMesh];
         
@@ -208,12 +211,21 @@
 }
 
 - (void)updateDistortionMesh {
+    // Ensure we have grid points before trying to update
+    if (self.distortedPoints.count == 0) {
+        return;
+    }
+    
     NSBezierPath* meshPath = [NSBezierPath bezierPath];
     
     // Draw horizontal lines
     for (NSInteger y = 0; y < _gridResolution; y++) {
         for (NSInteger x = 0; x < _gridResolution; x++) {
             NSInteger index = y * _gridResolution + x;
+            if (index >= self.distortedPoints.count) {
+                NSLog(@"WARNING: Grid index %ld out of bounds (count: %lu)", (long)index, (unsigned long)self.distortedPoints.count);
+                return;
+            }
             simd_float2 point;
             [self.distortedPoints[index] getValue:&point];
             
@@ -229,6 +241,9 @@
     for (NSInteger x = 0; x < _gridResolution; x++) {
         for (NSInteger y = 0; y < _gridResolution; y++) {
             NSInteger index = y * _gridResolution + x;
+            if (index >= self.distortedPoints.count) {
+                return;
+            }
             simd_float2 point;
             [self.distortedPoints[index] getValue:&point];
             
