@@ -2506,11 +2506,8 @@ extern "C" void showSimpleCommandPalette();
     
     NSLog(@"Building file tree for folder: %@", folderPath);
     
-    // Clear and retain the new array
-    if (_fileItems) {
-        [_fileItems release];
-    }
-    _fileItems = [[NSMutableArray alloc] init];
+    // Clear and create new array
+    _fileItems = [NSMutableArray array];
     
     NSFileManager* fm = [NSFileManager defaultManager];
     
@@ -2572,7 +2569,6 @@ extern "C" void showSimpleCommandPalette();
             NSArray* markdownExtensions = @[@"md", @"markdown", @"mdown", @"mkd", @"mdwn"];
             
             if (![markdownExtensions containsObject:extension]) {
-                [item release];
                 continue;
             }
             
@@ -2580,7 +2576,6 @@ extern "C" void showSimpleCommandPalette();
         }
         
         [array addObject:item];
-        [item release]; // Array retains it
     }
 }
 
@@ -2635,16 +2630,14 @@ extern "C" void showSimpleCommandPalette();
             NSArray* markdownExtensions = @[@"md", @"markdown", @"mdown", @"mkd", @"mdwn"];
             
             if (![markdownExtensions containsObject:extension]) {
-                [item release];
                 continue;
             }
             
             item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:extension];
         }
         
-        // Retain the item before adding to parent
+        // Add to parent's children array
         [parentItem.children addObject:item];
-        [item release]; // Parent's array retains it
     }
 }
 
