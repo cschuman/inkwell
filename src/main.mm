@@ -2716,17 +2716,18 @@ extern "C" void showSimpleCommandPalette();
     if (item == nil) {
         // Root level - check which outline view we're dealing with
         if (outlineView == _fileOutlineView) {
-            return [_fileItems count];
+            return _fileItems ? [_fileItems count] : 0;
         } else {
-            return [_tocItems count];
+            return _tocItems ? [_tocItems count] : 0;
         }
     }
     
     if ([item isKindOfClass:[TOCItem class]]) {
-        return [[(TOCItem*)item children] count];
+        TOCItem* tocItem = (TOCItem*)item;
+        return tocItem.children ? [tocItem.children count] : 0;
     } else if ([item isKindOfClass:[FileItem class]]) {
         FileItem* fileItem = (FileItem*)item;
-        return fileItem.isDirectory ? [fileItem.children count] : 0;
+        return (fileItem.isDirectory && fileItem.children) ? [fileItem.children count] : 0;
     }
     
     return 0;
@@ -2736,17 +2737,28 @@ extern "C" void showSimpleCommandPalette();
     if (item == nil) {
         // Root level - check which outline view we're dealing with
         if (outlineView == _fileOutlineView) {
-            return [_fileItems objectAtIndex:index];
+            if (_fileItems && index < [_fileItems count]) {
+                return [_fileItems objectAtIndex:index];
+            }
+            return nil;
         } else {
-            return [_tocItems objectAtIndex:index];
+            if (_tocItems && index < [_tocItems count]) {
+                return [_tocItems objectAtIndex:index];
+            }
+            return nil;
         }
     }
     
     if ([item isKindOfClass:[TOCItem class]]) {
-        return [[(TOCItem*)item children] objectAtIndex:index];
+        TOCItem* tocItem = (TOCItem*)item;
+        if (tocItem.children && index < [tocItem.children count]) {
+            return [tocItem.children objectAtIndex:index];
+        }
     } else if ([item isKindOfClass:[FileItem class]]) {
         FileItem* fileItem = (FileItem*)item;
-        return fileItem.isDirectory ? [fileItem.children objectAtIndex:index] : nil;
+        if (fileItem.isDirectory && fileItem.children && index < [fileItem.children count]) {
+            return [fileItem.children objectAtIndex:index];
+        }
     }
     
     return nil;
@@ -2763,6 +2775,11 @@ extern "C" void showSimpleCommandPalette();
 }
 
 - (NSView*)outlineView:(NSOutlineView*)outlineView viewForTableColumn:(NSTableColumn*)tableColumn item:(id)item {
+    // Validate item is not nil
+    if (!item) {
+        return nil;
+    }
+    
     NSTextField* textField = [[NSTextField alloc] init];
     [textField setEditable:NO];
     [textField setBordered:NO];
@@ -2770,6 +2787,12 @@ extern "C" void showSimpleCommandPalette();
     
     if (outlineView == _tocOutlineView && [item isKindOfClass:[TOCItem class]]) {
         TOCItem* tocItem = (TOCItem*)item;
+        
+        // Validate title exists
+        if (!tocItem.title) {
+            [textField setStringValue:@""];
+            return textField;
+        }
         
         // Format based on heading level
         NSFont* font;
@@ -2789,6 +2812,13 @@ extern "C" void showSimpleCommandPalette();
         [textField setStringValue:tocItem.title];
     } else if (outlineView == _fileOutlineView && [item isKindOfClass:[FileItem class]]) {
         FileItem* fileItem = (FileItem*)item;
+        
+        // Validate name exists
+        if (!fileItem.name) {
+            [textField setStringValue:@""];
+            return textField;
+        }
+        
         [textField setFont:[NSFont systemFontOfSize:12]];
         [textField setStringValue:fileItem.name];
         
@@ -2805,6 +2835,9 @@ extern "C" void showSimpleCommandPalette();
             
             // Adjust text field position to make room for icon
             textField.frame = NSMakeRect(22, 0, 200, 20);
+        } else {
+            [cellView addSubview:textField];
+            textField.frame = NSMakeRect(2, 0, 200, 20);
         }
         
         return cellView;
