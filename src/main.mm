@@ -2,6 +2,7 @@
 #import <MetalKit/MetalKit.h>
 #import <WebKit/WebKit.h>
 #import <QuartzCore/QuartzCore.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <mach/mach.h>
 #import <mach/mach_host.h>
 #include "core/markdown_parser.h"
@@ -49,6 +50,22 @@ extern "C" void showSimpleCommandPalette();
 @end
 
 @implementation KeyHandlingView
+
+- (instancetype)initWithFrame:(NSRect)frameRect {
+    self = [super initWithFrame:frameRect];
+    if (self) {
+        // Register for all file drag types from Finder
+        [self registerForDraggedTypes:@[
+            NSPasteboardTypeFileURL,
+            NSPasteboardTypeURL,
+            (NSString*)kUTTypeFileURL,  // Legacy UTI
+            NSFilenamesPboardType        // Legacy but sometimes needed
+        ]];
+        NSLog(@"KeyHandlingView: Registered for drag types");
+    }
+    return self;
+}
+
 - (BOOL)acceptsFirstResponder {
     return YES;
 }
@@ -57,6 +74,13 @@ extern "C" void showSimpleCommandPalette();
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
     if ([self.controller respondsToSelector:@selector(draggingEntered:)]) {
         return [(id)self.controller draggingEntered:sender];
+    }
+    return NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+    if ([self.controller respondsToSelector:@selector(draggingUpdated:)]) {
+        return [(id)self.controller draggingUpdated:sender];
     }
     return NSDragOperationNone;
 }
@@ -138,6 +162,16 @@ extern "C" void showSimpleCommandPalette();
     [super keyDown:event];
 }
 
+@end
+
+// Import effects system
+#import "../include/effects/effect_manager.h"
+#import "../include/effects/drag_effect_protocol.h"
+#import "effects/effect_debug_overlay.mm"
+
+// Forward declare the registry
+@interface EffectsRegistry : NSObject
++ (void)registerAllBuiltInEffects;
 @end
 
 @interface MarkdownViewController : NSViewController <NSDraggingDestination, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate, NSTextViewDelegate, CommandPaletteDelegate>
@@ -421,6 +455,59 @@ extern "C" void showSimpleCommandPalette();
     [focusItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
     [focusItem setTarget:nil];
     
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    
+    // Drag Effects submenu
+    NSMenuItem* effectsMenuItem = [[NSMenuItem alloc] init];
+    [effectsMenuItem setTitle:@"Drag Effects"];
+    [viewMenu addItem:effectsMenuItem];
+    
+    NSMenu* effectsMenu = [[NSMenu alloc] initWithTitle:@"Drag Effects"];
+    [effectsMenuItem setSubmenu:effectsMenu];
+    
+    // Next/Previous effect
+    NSMenuItem* nextEffectItem = [effectsMenu addItemWithTitle:@"Next Effect" 
+                                                         action:@selector(cycleToNextEffect) 
+                                                  keyEquivalent:@"E"];
+    [nextEffectItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+    [nextEffectItem setTarget:nil];
+    
+    NSMenuItem* prevEffectItem = [effectsMenu addItemWithTitle:@"Previous Effect" 
+                                                         action:@selector(cycleToPreviousEffect) 
+                                                  keyEquivalent:@"D"];
+    [prevEffectItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+    [prevEffectItem setTarget:nil];
+    
+    [effectsMenu addItem:[NSMenuItem separatorItem]];
+    
+    // Individual effect items will be added dynamically
+    NSMenuItem* classicItem = [effectsMenu addItemWithTitle:@"Classic Blue" 
+                                                      action:@selector(selectEffect:) 
+                                               keyEquivalent:@""];
+    [classicItem setTag:0];
+    [classicItem setTarget:nil];
+    
+    NSMenuItem* rippleItem = [effectsMenu addItemWithTitle:@"Ripple" 
+                                                     action:@selector(selectEffect:) 
+                                              keyEquivalent:@""];
+    [rippleItem setTag:1];
+    [rippleItem setTarget:nil];
+    
+    NSMenuItem* stardustItem = [effectsMenu addItemWithTitle:@"Stardust" 
+                                                       action:@selector(selectEffect:) 
+                                                keyEquivalent:@""];
+    [stardustItem setTag:2];
+    [stardustItem setTarget:nil];
+    
+    [effectsMenu addItem:[NSMenuItem separatorItem]];
+    
+    // Debug overlay toggle
+    NSMenuItem* debugOverlayItem = [effectsMenu addItemWithTitle:@"Show Debug Overlay" 
+                                                           action:@selector(toggleEffectDebugOverlay) 
+                                                    keyEquivalent:@"F"];
+    [debugOverlayItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+    [debugOverlayItem setTarget:nil];
+    
     [NSApp setMainMenu:mainMenu];
 }
 
@@ -546,8 +633,6 @@ extern "C" void showSimpleCommandPalette();
     NSTextField* _searchResultLabel;
     NSMutableArray* _searchResults;
     NSInteger _currentSearchIndex;
-    // Drag and drop visual feedback
-    NSView* _dragHighlightView;
     // id<MTLDevice> _device;  // Commented out for now
     // id<MTLCommandQueue> _commandQueue;  // Commented out for now
     std::unique_ptr<mdviewer::MarkdownParser> _parser;
@@ -648,6 +733,7 @@ extern "C" void showSimpleCommandPalette();
     NSRect frame = NSMakeRect(0, 0, 800, 600);
     KeyHandlingView* view = [[KeyHandlingView alloc] initWithFrame:frame];
     view.controller = self;
+    view.wantsLayer = YES;  // Enable layer backing for effects
     
     // Create search bar (hidden by default, at top)
     NSRect searchFrame = NSMakeRect(0, frame.size.height - 40, frame.size.width, 40);
@@ -827,9 +913,6 @@ extern "C" void showSimpleCommandPalette();
     
     // Initial update of scroll indicators
     [self updateScrollIndicators];
-    
-    // Enable drag and drop on the view
-    [view registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
     
     // Make view first responder when window appears
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1197,6 +1280,9 @@ extern "C" void showSimpleCommandPalette();
     
     // Start FPS tracking
     [self startFPSTracking];
+    
+    // Initialize effects system
+    [self setupEffectsSystem];
     
     // Check if we have a file to open from command line
     NSString* fileToOpen = [[NSUserDefaults standardUserDefaults] stringForKey:@"FileToOpenAtLaunch"];
@@ -2130,6 +2216,165 @@ extern "C" void showSimpleCommandPalette();
     return textField;
 }
 
+// MARK: - Effects System
+
+- (void)setupEffectsSystem {
+    // Register all built-in effects first
+    [EffectsRegistry registerAllBuiltInEffects];
+    
+    // Initialize effect manager
+    EffectManager* effectManager = [EffectManager sharedManager];
+    
+    // Start animation loop for effects
+    [effectManager startAnimationLoop];
+    
+    // Set up hotkeys for effect switching
+    [self setupEffectHotkeys];
+    
+    // Optionally show debug overlay (can be toggled via menu)
+    BOOL showDebug = [[NSUserDefaults standardUserDefaults] boolForKey:@"ShowEffectDebugOverlay"];
+    if (showDebug) {
+        [self showEffectDebugOverlay];
+    }
+    
+    NSLog(@"Effects system initialized with %lu effects", 
+          (unsigned long)effectManager.availableEffects.count);
+    
+    // Update menu checkmarks to reflect initial state
+    [self updateEffectMenuCheckmarks];
+}
+
+- (void)setupEffectHotkeys {
+    // Add local event monitor for hotkeys
+    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown 
+                                           handler:^NSEvent*(NSEvent* event) {
+        NSUInteger modifiers = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+        
+        // Cmd+Shift+E: Next effect
+        if ([event.charactersIgnoringModifiers isEqualToString:@"E"] &&
+            (modifiers & NSEventModifierFlagCommand) &&
+            (modifiers & NSEventModifierFlagShift)) {
+            [self cycleToNextEffect];
+            return nil; // Consume the event
+        }
+        
+        // Cmd+Shift+D: Previous effect
+        if ([event.charactersIgnoringModifiers isEqualToString:@"D"] &&
+            (modifiers & NSEventModifierFlagCommand) &&
+            (modifiers & NSEventModifierFlagShift)) {
+            [self cycleToPreviousEffect];
+            return nil; // Consume the event
+        }
+        
+        // Cmd+Shift+F: Toggle debug overlay
+        if ([event.charactersIgnoringModifiers isEqualToString:@"F"] &&
+            (modifiers & NSEventModifierFlagCommand) &&
+            (modifiers & NSEventModifierFlagShift)) {
+            [self toggleEffectDebugOverlay];
+            return nil; // Consume the event
+        }
+        
+        return event; // Pass through
+    }];
+}
+
+- (void)cycleToNextEffect {
+    [[EffectManager sharedManager] cycleToNextEffect];
+    [self showEffectNotification:[[EffectManager sharedManager].currentEffect effectName]];
+    [self updateEffectMenuCheckmarks];
+}
+
+- (void)cycleToPreviousEffect {
+    [[EffectManager sharedManager] cycleToPreviousEffect];
+    [self showEffectNotification:[[EffectManager sharedManager].currentEffect effectName]];
+    [self updateEffectMenuCheckmarks];
+}
+
+- (void)showEffectNotification:(NSString*)effectName {
+    // Show a brief notification of the current effect
+    NSTextField* notification = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 200, 40)];
+    notification.stringValue = [NSString stringWithFormat:@"Effect: %@", effectName];
+    notification.bezeled = NO;
+    notification.drawsBackground = YES;
+    notification.backgroundColor = [NSColor colorWithWhite:0.0 alpha:0.8];
+    notification.textColor = [NSColor whiteColor];
+    notification.font = [NSFont systemFontOfSize:16 weight:NSFontWeightMedium];
+    notification.alignment = NSTextAlignmentCenter;
+    notification.wantsLayer = YES;
+    notification.layer.cornerRadius = 8.0;
+    
+    // Center in view
+    NSRect viewBounds = self.view.bounds;
+    notification.frame = NSMakeRect((viewBounds.size.width - 200) / 2,
+                                    (viewBounds.size.height - 40) / 2,
+                                    200, 40);
+    
+    [self.view addSubview:notification positioned:NSWindowAbove relativeTo:nil];
+    
+    // Fade out after 1 second
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
+            context.duration = 0.3;
+            notification.animator.alphaValue = 0.0;
+        } completionHandler:^{
+            [notification removeFromSuperview];
+        }];
+    });
+}
+
+- (void)showEffectDebugOverlay {
+    [EffectDebugOverlay attachToView:self.view];
+}
+
+- (void)toggleEffectDebugOverlay {
+    // Find existing overlay
+    EffectDebugOverlay* overlay = nil;
+    for (NSView* subview in self.view.subviews) {
+        if ([subview isKindOfClass:[EffectDebugOverlay class]]) {
+            overlay = (EffectDebugOverlay*)subview;
+            break;
+        }
+    }
+    
+    if (overlay) {
+        [overlay removeFromSuperview];
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"ShowEffectDebugOverlay"];
+    } else {
+        [self showEffectDebugOverlay];
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"ShowEffectDebugOverlay"];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)selectEffect:(NSMenuItem*)sender {
+    [[EffectManager sharedManager] selectEffectAtIndex:sender.tag];
+    [self showEffectNotification:[[EffectManager sharedManager].currentEffect effectName]];
+    [self updateEffectMenuCheckmarks];
+}
+
+- (void)updateEffectMenuCheckmarks {
+    // Find the View menu
+    NSMenu* mainMenu = [NSApp mainMenu];
+    NSMenuItem* viewMenuItem = [mainMenu itemWithTitle:@"View"];
+    if (!viewMenuItem) return;
+    
+    NSMenu* viewMenu = [viewMenuItem submenu];
+    NSMenuItem* effectsMenuItem = [viewMenu itemWithTitle:@"Drag Effects"];
+    if (!effectsMenuItem) return;
+    
+    NSMenu* effectsMenu = [effectsMenuItem submenu];
+    
+    // Get current effect index
+    NSInteger currentIndex = [[EffectManager sharedManager] currentEffectIndex];
+    
+    // Update checkmarks - items with tags 0, 1, 2 are the effect items
+    for (NSMenuItem* item in [effectsMenu itemArray]) {
+        if (item.tag >= 0 && item.tag < 3) {
+            [item setState:(item.tag == currentIndex) ? NSControlStateValueOn : NSControlStateValueOff];
+        }
+    }
+}
+
 // MARK: - Drag and Drop Support
 
 - (BOOL)isMarkdownFile:(NSString*)pathExtension {
@@ -2144,40 +2389,113 @@ extern "C" void showSimpleCommandPalette();
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
     NSPasteboard* pasteboard = [sender draggingPasteboard];
     
+    NSLog(@"DragEntered: Available types: %@", [pasteboard types]);
+    
+    // Try multiple methods to get URLs
+    NSArray* urls = nil;
+    
+    // Method 1: Modern approach
     if ([pasteboard canReadObjectForClasses:@[[NSURL class]] options:nil]) {
-        NSArray* urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
-        for (NSURL* url in urls) {
-            if ([self isMarkdownFile:[url pathExtension]]) {
-                // Provide visual feedback - add a highlight overlay
-                if (!_dragHighlightView) {
-                    _dragHighlightView = [[NSView alloc] initWithFrame:self.view.bounds];
-                    _dragHighlightView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-                    _dragHighlightView.wantsLayer = YES;
-                    _dragHighlightView.layer.backgroundColor = [[NSColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:0.1] CGColor];
-                    _dragHighlightView.layer.borderColor = [[NSColor colorWithRed:0.0 green:0.5 blue:1.0 alpha:0.5] CGColor];
-                    _dragHighlightView.layer.borderWidth = 3.0;
-                    _dragHighlightView.layer.cornerRadius = 8.0;
-                }
-                [self.view addSubview:_dragHighlightView positioned:NSWindowAbove relativeTo:nil];
-                return NSDragOperationCopy;
+        urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
+        NSLog(@"Got URLs via readObjectsForClasses: %@", urls);
+    }
+    
+    // Method 2: Legacy filenames approach (sometimes needed for Finder)
+    if (!urls || urls.count == 0) {
+        NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
+        if (filenames) {
+            NSMutableArray* fileURLs = [NSMutableArray array];
+            for (NSString* filename in filenames) {
+                [fileURLs addObject:[NSURL fileURLWithPath:filename]];
             }
+            urls = fileURLs;
+            NSLog(@"Got URLs via NSFilenamesPboardType: %@", urls);
         }
     }
     
+    // Check if any URL is a markdown file
+    for (NSURL* url in urls) {
+        if ([self isMarkdownFile:[url pathExtension]]) {
+            NSLog(@"DragEntered: Markdown file detected: %@", url.path);
+            
+            // Use effect manager for visual feedback
+            EffectManager* effectManager = [EffectManager sharedManager];
+            NSLog(@"Current effect: %@", [effectManager.currentEffect effectName]);
+            
+            if (effectManager.currentEffect) {
+                NSPoint point = [self.view convertPoint:[sender draggingLocation] fromView:nil];
+                NSLog(@"Setting up effect at point: %@", NSStringFromPoint(point));
+                
+                if ([effectManager.currentEffect isKindOfClass:[BaseDragEffect class]]) {
+                    [(BaseDragEffect*)effectManager.currentEffect setTargetView:self.view];
+                }
+                [effectManager.currentEffect onDragEnter:point];
+                [effectManager.currentEffect renderToView:self.view];
+            }
+            return NSDragOperationCopy;
+        }
+    }
+    
+    NSLog(@"DragEntered: No markdown files found");
+    return NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
+    // Update effect position as drag moves
+    EffectManager* effectManager = [EffectManager sharedManager];
+    BOOL isDragging = NO;
+    if ([effectManager.currentEffect isKindOfClass:[BaseDragEffect class]]) {
+        isDragging = [(BaseDragEffect*)effectManager.currentEffect isDragging];
+    }
+    
+    if (effectManager.currentEffect && isDragging) {
+        NSPoint point = [self.view convertPoint:[sender draggingLocation] fromView:nil];
+        [effectManager.currentEffect onDragMove:point];
+        [effectManager.currentEffect renderToView:self.view];
+        return NSDragOperationCopy;
+    }
     return NSDragOperationNone;
 }
 
 - (void)draggingExited:(id<NSDraggingInfo>)sender {
-    // Reset visual feedback
-    [_dragHighlightView removeFromSuperview];
+    NSLog(@"DragExited: Cleaning up effect");
+    // Reset visual feedback using effect manager
+    EffectManager* effectManager = [EffectManager sharedManager];
+    if (effectManager.currentEffect) {
+        [effectManager.currentEffect onDragExit];
+    }
 }
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
-    // Reset visual feedback
-    [_dragHighlightView removeFromSuperview];
+    NSLog(@"PerformDragOperation: Drop occurred");
+    // Reset visual feedback using effect manager
+    EffectManager* effectManager = [EffectManager sharedManager];
+    if (effectManager.currentEffect) {
+        NSPoint point = [self.view convertPoint:[sender draggingLocation] fromView:nil];
+        [effectManager.currentEffect onDrop:point];
+    }
     
     NSPasteboard* pasteboard = [sender draggingPasteboard];
-    NSArray* urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
+    
+    // Try multiple methods to get URLs (same as draggingEntered)
+    NSArray* urls = nil;
+    
+    // Method 1: Modern approach
+    if ([pasteboard canReadObjectForClasses:@[[NSURL class]] options:nil]) {
+        urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
+    }
+    
+    // Method 2: Legacy filenames approach
+    if (!urls || urls.count == 0) {
+        NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
+        if (filenames && filenames.count > 0) {
+            NSMutableArray* fileURLs = [NSMutableArray array];
+            for (NSString* filename in filenames) {
+                [fileURLs addObject:[NSURL fileURLWithPath:filename]];
+            }
+            urls = fileURLs;
+        }
+    }
     
     if ([urls count] > 0) {
         NSURL* url = [urls firstObject];

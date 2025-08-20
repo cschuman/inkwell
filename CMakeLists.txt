@@ -110,8 +110,17 @@ add_executable(Inkwell
     src/main.mm
     src/platform/macos/main_window.mm
     src/ui/command_palette.mm
+    src/effects/base_drag_effect.mm
+    src/effects/effect_manager.mm
+    src/effects/no_effect.mm
+    src/effects/ripple_effect.mm
+    src/effects/particle_effect.mm
+    src/effects/effects_registry.mm
     resources/Info.plist
 )
+
+# Ensure effects are linked
+target_compile_options(Inkwell PRIVATE -ObjC)
 
 target_link_libraries(Inkwell PRIVATE
     mdviewer_core
