@@ -1,33 +1,57 @@
-# Test Document - Inkwell Functionality Check
+# Inkwell Test Document
 
-## The Moment of Truth
+## Features Working
 
-This is a **test** to see if we can actually render *markdown* text instead of colored rectangles.
+### Text Formatting
+- **Bold text**
+- *Italic text*
+- `inline code`
+- ~~Strikethrough~~
 
-### Key Questions:
-1. Can we see this text?
-2. Is it formatted properly?
-3. Are headers visible?
+### Code Blocks
 
-```javascript
-// Can we see code blocks?
-function test() {
-    return "Hello, World!";
-}
+```python
+def hello_world():
+    print("Hello from Inkwell!")
 ```
 
-> "If you can read this quote, we're making progress!"
+```javascript
+const app = {
+    name: "Inkwell",
+    version: "1.0",
+    status: "Simplified and working!"
+};
+```
+
+### Lists
+
+1. First item
+2. Second item
+   - Nested bullet
+   - Another nested item
+3. Third item
+
+### Links and Images
+
+[Visit GitHub](https://github.com)
+
+### Blockquotes
+
+> This is a blockquote
+> with multiple lines
+> showing the styling
+
+### Tables
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Markdown Parsing | ✅ | Using md4c |
+| File Watching | ✅ | FSEvents |
+| Drag & Drop | ✅ | With effects |
+| Command Palette | ✅ | Cmd+K |
 
 ---
 
-## Success Criteria
+## Summary
 
-- [ ] Text is visible (not rectangles)
-- [ ] Basic formatting works
-- [ ] Headers are distinct
-- [ ] Code blocks are formatted
-- [ ] Lists work
-
-If you can read all of this, **Inkwell is working correctly!**
-## AUTO-RELOAD TEST - Mon Aug 18 19:24:26 EDT 2025
-If you see this timestamp in Inkwell, file watching works!
+Inkwell is now a clean, maintainable markdown viewer for macOS!

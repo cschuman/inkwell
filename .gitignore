@@ -44,6 +44,11 @@ vcpkg_installed/
 test_vim.md
 test.md
 *.log
+test_*.sh
+
+# Archive directory
+archive/
+*.dmg
 
 # Backup files
 *.bak

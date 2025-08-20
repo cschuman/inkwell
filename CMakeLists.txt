@@ -11,14 +11,10 @@ set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
 
 # Find packages
 find_package(fmt CONFIG REQUIRED)
-# find_package(folly CONFIG REQUIRED)
-# find_package(GTest CONFIG REQUIRED) # DISABLED - tests disabled
-# find_package(benchmark CONFIG REQUIRED) # DISABLED - benchmarks disabled
+find_package(GTest CONFIG REQUIRED)
 
 # Find system frameworks
 find_library(COCOA_FRAMEWORK Cocoa)
-find_library(METAL_FRAMEWORK Metal)
-find_library(METALKIT_FRAMEWORK MetalKit)
 find_library(CORETEXT_FRAMEWORK CoreText)
 find_library(QUARTZ_FRAMEWORK Quartz)
 find_library(QUARTZCORE_FRAMEWORK QuartzCore)
@@ -37,10 +33,8 @@ FetchContent_MakeAvailable(md4c)
 # Core library
 add_library(mdviewer_core STATIC
     src/core/markdown_parser.cpp
-    src/core/virtual_dom.cpp
     src/core/document.cpp
     src/core/toc_generator.cpp
-    src/utils/memory_pool.cpp
     src/utils/string_utils.cpp
     src/utils/file_utils.cpp
 )
@@ -88,10 +82,7 @@ target_link_libraries(mdviewer_ui PUBLIC
 
 # Rendering library
 add_library(mdviewer_rendering STATIC
-    src/rendering/metal_renderer.mm
     src/rendering/text_layout.cpp
-    src/rendering/glyph_atlas.mm
-    src/rendering/render_engine.mm
     src/rendering/markdown_renderer.mm
     src/rendering/mermaid_renderer.mm
 )
@@ -99,8 +90,6 @@ add_library(mdviewer_rendering STATIC
 target_link_libraries(mdviewer_rendering PUBLIC
     mdviewer_core
     mdviewer_ui
-    ${METAL_FRAMEWORK}
-    ${METALKIT_FRAMEWORK}
     ${CORETEXT_FRAMEWORK}
     ${COCOA_FRAMEWORK}
 )
@@ -120,8 +109,6 @@ add_executable(Inkwell
     src/effects/physics_world.mm
     src/effects/animation_orchestrator.mm
     src/effects/noise_generator.mm
-    src/effects/gravitational_wake_effect.mm
-    src/effects/liquid_glass_effect.mm
     resources/Info.plist
 )
 
@@ -142,46 +129,18 @@ set_target_properties(Inkwell PROPERTIES
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.coreymd.inkwell"
 )
 
-# Metal shaders
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders.metallib
-    COMMAND xcrun -sdk macosx metal -c ${CMAKE_CURRENT_SOURCE_DIR}/shaders/text_render.metal -o ${CMAKE_CURRENT_BINARY_DIR}/text_render.air
-    COMMAND xcrun -sdk macosx metal -c ${CMAKE_CURRENT_SOURCE_DIR}/shaders/enhanced_render.metal -o ${CMAKE_CURRENT_BINARY_DIR}/enhanced_render.air
-    COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/text_render.air ${CMAKE_CURRENT_BINARY_DIR}/enhanced_render.air -o ${CMAKE_CURRENT_BINARY_DIR}/shaders.metallib
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/text_render.metal ${CMAKE_CURRENT_SOURCE_DIR}/shaders/enhanced_render.metal
-)
 
-add_custom_target(shaders ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shaders.metallib)
-add_dependencies(Inkwell shaders)
-
-# Tests - DISABLED FOR NOW (cleanup in progress)
+# Tests - temporarily disabled during simplification
 # enable_testing()
-# 
 # add_executable(mdviewer_tests
 #     tests/test_parser.cpp
-#     tests/test_virtual_dom.cpp
-#     tests/test_memory_pool.cpp
 #     tests/test_toc_generator.cpp
 # )
-# 
 # target_link_libraries(mdviewer_tests PRIVATE
 #     mdviewer_core
 #     GTest::gtest_main
 # )
-# 
 # add_test(NAME mdviewer_tests COMMAND mdviewer_tests)
-# 
-# # Benchmarks - DISABLED FOR NOW
-# add_executable(mdviewer_benchmarks
-#     tests/bench_parser.cpp
-#     tests/bench_rendering.cpp
-# )
-# 
-# target_link_libraries(mdviewer_benchmarks PRIVATE
-#     mdviewer_core
-#     mdviewer_rendering
-#     benchmark::benchmark_main
-# )
 
 # Installation
 install(TARGETS Inkwell

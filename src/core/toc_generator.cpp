@@ -1,116 +1,52 @@
-#include "core/document.h"
 #include "core/toc_generator.h"
-#include <algorithm>
-#include <stack>
+#include <regex>
 
 namespace mdviewer {
 
-class TOCGenerator {
-public:
-    static void generate(Document::TableOfContents& toc, const Document::Node* root) {
-        toc.entries.clear();
-        if (!root) return;
-        
-        std::stack<Document::TableOfContents::Entry*> entry_stack;
-        size_t node_index = 0;
-        
-        traverse_node(root, toc, entry_stack, node_index);
-        
-        organize_hierarchy(toc);
+TOCGenerator::TOC TOCGenerator::generate(const std::string& markdown) {
+    TOC toc;
+    
+    if (markdown.empty()) {
+        return toc;
     }
     
-private:
-    static void traverse_node(
-        const Document::Node* node,
-        Document::TableOfContents& toc,
-        std::stack<Document::TableOfContents::Entry*>& entry_stack,
-        size_t& node_index
-    ) {
-        if (node->type == Document::NodeType::Heading && node->heading_level > 0) {
-            Document::TableOfContents::Entry entry;
-            entry.text = extract_text(node);
-            entry.level = node->heading_level;
-            entry.node_index = node_index;
-            
-            // Pop entries from stack until we find parent level
-            while (!entry_stack.empty() && entry_stack.top()->level >= entry.level) {
-                entry_stack.pop();
-            }
-            
-            if (entry_stack.empty()) {
-                toc.entries.push_back(std::move(entry));
-                entry_stack.push(&toc.entries.back());
-            } else {
-                entry_stack.top()->children.push_back(std::move(entry));
-                entry_stack.push(&entry_stack.top()->children.back());
-            }
-        }
+    // Simple regex-based extraction for headings
+    std::regex heading_regex(R"(^(#{1,6})\s+(.+)$)", std::regex::multiline);
+    auto begin = std::sregex_iterator(markdown.begin(), markdown.end(), heading_regex);
+    auto end = std::sregex_iterator();
+    
+    for (auto it = begin; it != end; ++it) {
+        std::smatch match = *it;
+        TOCItem item;
+        item.level = match[1].length();  // Number of # characters
+        item.title = match[2].str();
+        item.offset = match.position();
         
-        for (const auto& child : node->children) {
-            traverse_node(child.get(), toc, entry_stack, ++node_index);
-        }
+        // Strip markdown formatting from title
+        item.title = stripMarkdownFormatting(item.title);
+        
+        toc.items.push_back(item);
     }
     
-    static std::string extract_text(const Document::Node* node) {
-        std::string text;
-        extract_text_recursive(node, text);
-        return text;
-    }
-    
-    static void extract_text_recursive(const Document::Node* node, std::string& text) {
-        if (node->type == Document::NodeType::Text) {
-            text += node->content;
-        }
-        
-        for (const auto& child : node->children) {
-            extract_text_recursive(child.get(), text);
-        }
-    }
-    
-    static void organize_hierarchy(Document::TableOfContents& toc) {
-        std::vector<Document::TableOfContents::Entry> organized;
-        
-        for (auto& entry : toc.entries) {
-            if (entry.level == 1) {
-                organized.push_back(std::move(entry));
-            } else {
-                // Find appropriate parent
-                auto* parent = find_parent_entry(organized, entry.level);
-                if (parent) {
-                    parent->children.push_back(std::move(entry));
-                } else {
-                    organized.push_back(std::move(entry));
-                }
-            }
-        }
-        
-        toc.entries = std::move(organized);
-    }
-    
-    static Document::TableOfContents::Entry* find_parent_entry(
-        std::vector<Document::TableOfContents::Entry>& entries,
-        int child_level
-    ) {
-        for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
-            if (it->level < child_level) {
-                return &(*it);
-            }
-            
-            auto* nested_parent = find_parent_entry(it->children, child_level);
-            if (nested_parent) {
-                return nested_parent;
-            }
-        }
-        return nullptr;
-    }
-};
-
-void Document::TableOfContents::generate(const Node* root) {
-    TOCGenerator::generate(*this, root);
+    return toc;
 }
 
-void Document::regenerate_toc() {
-    toc_.generate(root_.get());
+std::string TOCGenerator::stripMarkdownFormatting(const std::string& text) {
+    std::string result = text;
+    
+    // Remove bold markers
+    result = std::regex_replace(result, std::regex(R"(\*\*|__)"), "");
+    
+    // Remove italic markers
+    result = std::regex_replace(result, std::regex(R"(\*|_)"), "");
+    
+    // Remove inline code markers
+    result = std::regex_replace(result, std::regex("`"), "");
+    
+    // Remove links but keep link text
+    result = std::regex_replace(result, std::regex(R"(\[([^\]]+)\]\([^\)]+\))"), "$1");
+    
+    return result;
 }
 
 } // namespace mdviewer

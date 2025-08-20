@@ -63,11 +63,11 @@
 
 - (instancetype)init {
     if (self = [super init]) {
-        _attractors = [NSMutableArray array];
-        _attractorStrengths = [NSMutableArray array];
-        _vortices = [NSMutableArray array];
-        _vortexStrengths = [NSMutableArray array];
-        _vortexRadii = [NSMutableArray array];
+        _attractors = [[NSMutableArray alloc] init];
+        _attractorStrengths = [[NSMutableArray alloc] init];
+        _vortices = [[NSMutableArray alloc] init];
+        _vortexStrengths = [[NSMutableArray alloc] init];
+        _vortexRadii = [[NSMutableArray alloc] init];
     }
     return self;
 }
@@ -131,11 +131,21 @@
 }
 
 - (void)clear {
-    [self.attractors removeAllObjects];
-    [self.attractorStrengths removeAllObjects];
-    [self.vortices removeAllObjects];
-    [self.vortexStrengths removeAllObjects];
-    [self.vortexRadii removeAllObjects];
+    if (self.attractors) {
+        [self.attractors removeAllObjects];
+    }
+    if (self.attractorStrengths) {
+        [self.attractorStrengths removeAllObjects];
+    }
+    if (self.vortices) {
+        [self.vortices removeAllObjects];
+    }
+    if (self.vortexStrengths) {
+        [self.vortexStrengths removeAllObjects];
+    }
+    if (self.vortexRadii) {
+        [self.vortexRadii removeAllObjects];
+    }
 }
 
 @end
@@ -159,9 +169,9 @@
         _airDensity = 1.2f;
         _windVelocity = simd_make_float2(0, 0);
         
-        _particles = [NSMutableArray array];
-        _constraints = [NSMutableArray array];
-        _spatialHash = [NSMutableDictionary dictionary];
+        _particles = [[NSMutableArray alloc] init];
+        _constraints = [[NSMutableArray alloc] init];
+        _spatialHash = [[NSMutableDictionary alloc] init];
         _vectorField = [[VectorField alloc] init];
         
         _currentTime = 0;
@@ -170,7 +180,17 @@
 }
 
 - (PhysicsParticle*)addParticleAt:(simd_float2)position withMass:(float)mass {
+    if (!self.particles) {
+        NSLog(@"PhysicsWorld: ERROR - particles array is nil in addParticleAt");
+        return nil;
+    }
+    
     PhysicsParticle* particle = [[PhysicsParticle alloc] init];
+    if (!particle) {
+        NSLog(@"PhysicsWorld: ERROR - failed to create particle");
+        return nil;
+    }
+    
     particle.position = position;
     particle.oldPosition = position;
     particle.mass = mass;
@@ -178,7 +198,8 @@
     [self.particles addObject:particle];
     [self updateSpatialHashForParticle:particle];
     
-    return [particle autorelease];
+    // The particle is retained by the particles array, return without autorelease
+    return particle;
 }
 
 - (void)removeParticle:(PhysicsParticle*)particle {

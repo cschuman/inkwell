@@ -1,8 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
-#import <MetalKit/MetalKit.h>
 #include "ui/design_system.h"
-#include "rendering/render_engine.h"
 
 using namespace mdviewer::ui;
 

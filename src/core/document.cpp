@@ -1,6 +1,7 @@
 #include "core/document.h"
 #include <algorithm>
 #include <numeric>
+#include <functional>
 #ifdef __x86_64__
 #include <immintrin.h>
 #elif defined(__aarch64__)
@@ -11,6 +12,30 @@ namespace mdviewer {
 
 Document::Document() = default;
 Document::~Document() = default;
+
+void Document::regenerate_toc() {
+    // Simple implementation - extract headings
+    toc_.entries.clear();
+    if (!root_) return;
+    
+    size_t node_index = 0;
+    std::function<void(const Node*)> extract = [&](const Node* node) {
+        if (node->type == NodeType::Heading && node->heading_level > 0) {
+            TableOfContents::Entry entry;
+            entry.text = node->content;
+            entry.level = node->heading_level;
+            entry.node_index = node_index;
+            toc_.entries.push_back(entry);
+        }
+        node_index++;
+        
+        for (const auto& child : node->children) {
+            extract(child.get());
+        }
+    };
+    
+    extract(root_.get());
+}
 
 void Document::set_root(std::unique_ptr<Node> root) {
     root_ = std::move(root);

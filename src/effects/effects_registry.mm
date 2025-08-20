@@ -1,20 +1,14 @@
 #import "../../include/effects/effect_manager.h"
 #import "../../include/effects/drag_effect_protocol.h"
 
-// Forward declare effect classes
+// Forward declare the simple effects that are defined in their own files
 @interface NoEffect : BaseDragEffect
 @end
 
-@interface RippleEffect : BaseDragEffect
+@interface RippleEffect : BaseDragEffect 
 @end
 
 @interface ParticleEffect : BaseDragEffect
-@end
-
-@interface GravitationalWakeEffect : BaseDragEffect
-@end
-
-@interface LiquidGlassEffect : BaseDragEffect
 @end
 
 @interface EffectsRegistry : NSObject
@@ -30,8 +24,6 @@
     [manager registerEffect:[[NoEffect alloc] init]];
     [manager registerEffect:[[RippleEffect alloc] init]];
     [manager registerEffect:[[ParticleEffect alloc] init]];
-    [manager registerEffect:[[GravitationalWakeEffect alloc] init]];
-    [manager registerEffect:[[LiquidGlassEffect alloc] init]];
     
     // Set default effect
     [manager selectEffectByName:@"Classic Blue"];

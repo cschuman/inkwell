@@ -1,118 +1,75 @@
-# Inkwell - Native macOS Markdown Viewer
+# Inkwell
 
-**Version: 0.1.0**  
-**Status: Beta**
-
-## Overview
-
-Inkwell is a native macOS markdown viewer built with C++ and Objective-C++. It provides fast, native rendering of markdown documents with a clean, minimal interface.
+A fast, native markdown viewer for macOS.
 
 ## Features
 
-### Working Features
-- **File Operations**
-  - Open markdown files via File menu or command line
-  - Drag and drop support
-  - Recent files menu
-  - File watching with auto-reload
-
-- **Text Display**
-  - Syntax highlighting for headers, bold, italic, code blocks
-  - Smooth scrolling
-  - Dark mode support
-
-- **Navigation**
-  - Vim-style keyboard navigation (j/k/g/G)
-  - Search with highlighting (Cmd+F)
-  - Find next/previous (Cmd+G/Cmd+Shift+G)
-
-- **User Interface**
-  - Command palette (Cmd+K)
-  - Native macOS look and feel
-  - Minimal, distraction-free viewing
-
-### Additional Features
-- Table of Contents sidebar (Cmd+Option+T)
-- Export to HTML/PDF (Cmd+Shift+E)
-- Zoom controls (Cmd++/Cmd+-/Cmd+0)
-- Window position/size persistence
-- Command palette with fuzzy search (Cmd+K)
-
-### Not Yet Implemented
-- Preferences window
-- TOC item click navigation
-- Themes customization
+- **Native macOS application** with Cocoa integration
+- **File watching** for automatic refresh
+- **Drag & drop** support with visual feedback
+- **Command palette** for quick actions
+- **Table of contents** extraction
+- **Dark mode** support
+- **Smooth scrolling** with native momentum
 
 ## Installation
 
-### Requirements
+### Build from Source
+
+Requirements:
 - macOS 11.0 or later
 - Xcode Command Line Tools
 - CMake 3.20+
-- vcpkg (optional, for dependency management)
-
-### Building from Source
+- vcpkg
 
 ```bash
-# Clone the repository
-git clone https://github.com/cschuman/inkwell.git
-cd inkwell
+# Install dependencies
+vcpkg install
 
 # Build
-chmod +x build_simple.sh
-./build_simple.sh
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build build -j$(sysctl -n hw.ncpu)
 
-# Run
-open build_simple/Inkwell.app
-# Or from command line:
-./build_simple/Inkwell.app/Contents/MacOS/Inkwell README.md
+# Install to /Applications
+cmake --install build --prefix /Applications
 ```
 
 ## Usage
 
-### Opening Files
-- **File Menu**: File → Open (Cmd+O)
-- **Command Line**: `Inkwell document.md`
-- **Drag & Drop**: Drop markdown files onto the app window
+Open markdown files:
+```bash
+open -a Inkwell document.md
+```
 
-### Keyboard Shortcuts
-- `Cmd+O` - Open file
-- `Cmd+F` - Search
-- `Cmd+G` - Find next
-- `Cmd+Shift+G` - Find previous
-- `Cmd+K` - Command palette
-- `j/k` - Scroll down/up
-- `g/G` - Go to top/bottom
-- `ESC` - Close search
+Or drag and drop markdown files onto the application icon.
+
+## Keyboard Shortcuts
+
+- `⌘O` - Open file
+- `⌘W` - Close window
+- `⌘Q` - Quit application
+- `⌘K` - Open command palette
+- `⌘+` - Increase font size
+- `⌘-` - Decrease font size
+- `⌘0` - Reset font size
 
 ## Architecture
 
-- **Language**: C++20 with Objective-C++
-- **UI Framework**: Native Cocoa/AppKit
-- **Markdown Parser**: md4c
-- **Text Rendering**: NSTextView with syntax highlighting
-- **Build System**: CMake with vcpkg for dependencies
-
-## Known Limitations
-
-- Read-only viewer (no editing capabilities)
-- Table of Contents sidebar not yet functional
-- Export features not implemented
-- Some advanced markdown features may not render correctly
-
-## Contributing
-
-Contributions are welcome! Priority areas for improvement:
-- Implementing Table of Contents navigation
-- Adding export functionality (HTML/PDF)
-- Improving markdown rendering coverage
-- Adding preferences/settings window
+Inkwell is built with:
+- **C++20** for core logic
+- **Objective-C++** for macOS integration
+- **NSTextView** for text rendering
+- **md4c** for markdown parsing
+- **FSEvents** for file monitoring
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - See LICENSE file for details
 
-## Acknowledgments
+## Contributing
 
-- md4c markdown parser by Martin Mitáš
-- Original architecture inspired by performance-focused design principles
+Contributions are welcome! Please feel free to submit pull requests.
+
+## Project Status
+
+Version 1.0 focuses on core functionality and stability. The codebase has been simplified from earlier experimental versions to ensure reliability and maintainability.

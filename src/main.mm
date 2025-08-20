@@ -6,7 +6,6 @@
 #import <mach/mach.h>
 #import <mach/mach_host.h>
 #include "core/markdown_parser.h"
-#include "rendering/render_engine.h"
 #include "rendering/markdown_renderer.h"
 #include "platform/file_watcher.h"
 #import "ui/command_palette.h"
@@ -498,6 +497,18 @@ extern "C" void showSimpleCommandPalette();
                                                 keyEquivalent:@""];
     [stardustItem setTag:2];
     [stardustItem setTarget:nil];
+    
+    NSMenuItem* gravitationalItem = [effectsMenu addItemWithTitle:@"Gravitational Wake" 
+                                                           action:@selector(selectEffect:) 
+                                                    keyEquivalent:@""];
+    [gravitationalItem setTag:3];
+    [gravitationalItem setTarget:nil];
+    
+    NSMenuItem* liquidGlassItem = [effectsMenu addItemWithTitle:@"Liquid Glass" 
+                                                         action:@selector(selectEffect:) 
+                                                  keyEquivalent:@""];
+    [liquidGlassItem setTag:4];
+    [liquidGlassItem setTarget:nil];
     
     [effectsMenu addItem:[NSMenuItem separatorItem]];
     
