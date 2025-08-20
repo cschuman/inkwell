@@ -11,6 +11,9 @@
 @interface ParticleEffect : BaseDragEffect
 @end
 
+@interface GravitationalWakeEffect : BaseDragEffect
+@end
+
 @interface EffectsRegistry : NSObject
 + (void)registerAllBuiltInEffects;
 @end
@@ -24,6 +27,7 @@
     [manager registerEffect:[[NoEffect alloc] init]];
     [manager registerEffect:[[RippleEffect alloc] init]];
     [manager registerEffect:[[ParticleEffect alloc] init]];
+    [manager registerEffect:[[GravitationalWakeEffect alloc] init]];
     
     // Set default effect
     [manager selectEffectByName:@"Classic Blue"];

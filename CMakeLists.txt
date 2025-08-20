@@ -116,6 +116,10 @@ add_executable(Inkwell
     src/effects/ripple_effect.mm
     src/effects/particle_effect.mm
     src/effects/effects_registry.mm
+    src/effects/physics_world.mm
+    src/effects/animation_orchestrator.mm
+    src/effects/noise_generator.mm
+    src/effects/gravitational_wake_effect.mm
     resources/Info.plist
 )
 
