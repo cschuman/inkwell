@@ -519,6 +519,29 @@ extern "C" void showSimpleCommandPalette();
     [debugOverlayItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
     [debugOverlayItem setTarget:nil];
     
+    // Tools menu
+    NSMenuItem* toolsMenuItem = [[NSMenuItem alloc] init];
+    [mainMenu addItem:toolsMenuItem];
+    
+    NSMenu* toolsMenu = [[NSMenu alloc] initWithTitle:@"Tools"];
+    [toolsMenuItem setSubmenu:toolsMenu];
+    
+    // Check if CLI is already installed
+    NSFileManager* fm = [NSFileManager defaultManager];
+    BOOL cliInstalled = [fm fileExistsAtPath:@"/usr/local/bin/inkwell"];
+    
+    if (!cliInstalled) {
+        NSMenuItem* installCLIItem = [toolsMenu addItemWithTitle:@"Install Command Line Tools" 
+                                                           action:@selector(installCommandLineTools:) 
+                                                    keyEquivalent:@""];
+        [installCLIItem setTarget:self];
+    } else {
+        NSMenuItem* installedItem = [toolsMenu addItemWithTitle:@"Command Line Tools Installed ✓" 
+                                                          action:nil 
+                                                   keyEquivalent:@""];
+        [installedItem setEnabled:NO];
+    }
+    
     [NSApp setMainMenu:mainMenu];
 }
 
@@ -571,6 +594,170 @@ extern "C" void showSimpleCommandPalette();
     [alert addButtonWithTitle:@"OK"];
     [alert setIcon:[NSImage imageNamed:NSImageNameInfo]];
     [alert runModal];
+}
+
+- (void)installCommandLineTools:(id)sender {
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setMessageText:@"Install Command Line Tools"];
+    [alert setInformativeText:@"This will create a symbolic link to allow you to use 'inkwell' from the terminal.\n\nExample usage:\n  inkwell file.md\n  inkwell ~/Documents/README.md\n\nThe link will be created at /usr/local/bin/inkwell\n\nYou will be prompted for your password."];
+    [alert addButtonWithTitle:@"Install"];
+    [alert addButtonWithTitle:@"Cancel"];
+    
+    NSModalResponse response = [alert runModal];
+    if (response == NSAlertFirstButtonReturn) {
+        // Get the app bundle path
+        NSString* appPath = [[NSBundle mainBundle] bundlePath];
+        NSString* executablePath = [appPath stringByAppendingPathComponent:@"Contents/MacOS/Inkwell"];
+        
+        // Use AppleScript to run the command with admin privileges
+        NSString* script = [NSString stringWithFormat:
+            @"do shell script \"mkdir -p /usr/local/bin && ln -sf '%@' /usr/local/bin/inkwell\" with administrator privileges",
+            executablePath];
+        
+        NSDictionary* error = nil;
+        NSAppleScript* appleScript = [[NSAppleScript alloc] initWithSource:script];
+        NSAppleEventDescriptor* result = [appleScript executeAndReturnError:&error];
+        
+        if (result) {
+            // Verify the installation worked
+            NSFileManager* fm = [NSFileManager defaultManager];
+            if ([fm fileExistsAtPath:@"/usr/local/bin/inkwell"]) {
+                NSAlert* successAlert = [[NSAlert alloc] init];
+                [successAlert setMessageText:@"Installation Successful"];
+                [successAlert setInformativeText:@"Command line tools installed successfully!\n\nYou can now use 'inkwell' from the terminal:\n  inkwell file.md\n  inkwell ~/Documents/README.md\n\nNote: Make sure /usr/local/bin is in your PATH."];
+                [successAlert addButtonWithTitle:@"OK"];
+                [successAlert runModal];
+                
+                // Update the menu to show it's installed
+                [self updateToolsMenu];
+            } else {
+                NSAlert* errorAlert = [[NSAlert alloc] init];
+                [errorAlert setMessageText:@"Installation Failed"];
+                [errorAlert setInformativeText:@"The symlink could not be verified. Please try again."];
+                [errorAlert addButtonWithTitle:@"OK"];
+                [errorAlert runModal];
+            }
+        } else {
+            // User cancelled or there was an error
+            if (error[@"NSAppleScriptErrorNumber"] && [error[@"NSAppleScriptErrorNumber"] intValue] == -128) {
+                // User cancelled - do nothing
+            } else {
+                // Show error with copy-able command
+                NSString* command = [NSString stringWithFormat:@"sudo ln -sf '%@' /usr/local/bin/inkwell", executablePath];
+                
+                NSAlert* errorAlert = [[NSAlert alloc] init];
+                [errorAlert setMessageText:@"Installation Failed"];
+                
+                NSTextField* textField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 400, 100)];
+                [textField setStringValue:[NSString stringWithFormat:
+                    @"Could not install command line tools.\n\nYou can manually install by running this command in Terminal:\n\n%@", command]];
+                [textField setEditable:NO];
+                [textField setSelectable:YES];
+                [textField setBordered:NO];
+                [textField setDrawsBackground:NO];
+                
+                [errorAlert setAccessoryView:textField];
+                [errorAlert addButtonWithTitle:@"Copy Command"];
+                [errorAlert addButtonWithTitle:@"OK"];
+                
+                NSModalResponse errorResponse = [errorAlert runModal];
+                if (errorResponse == NSAlertFirstButtonReturn) {
+                    // Copy command to clipboard
+                    NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
+                    [pasteboard clearContents];
+                    [pasteboard setString:command forType:NSStringPboardType];
+                    
+                    // Show confirmation
+                    NSAlert* copiedAlert = [[NSAlert alloc] init];
+                    [copiedAlert setMessageText:@"Command Copied"];
+                    [copiedAlert setInformativeText:@"The installation command has been copied to your clipboard.\n\nPaste it in Terminal and press Enter."];
+                    [copiedAlert addButtonWithTitle:@"OK"];
+                    [copiedAlert runModal];
+                }
+            }
+        }
+    }
+}
+
+- (void)updateToolsMenu {
+    NSMenu* mainMenu = [NSApp mainMenu];
+    NSMenuItem* toolsMenuItem = [mainMenu itemWithTitle:@"Tools"];
+    if (!toolsMenuItem) return;
+    
+    NSMenu* toolsMenu = [toolsMenuItem submenu];
+    [toolsMenu removeAllItems];
+    
+    // Check if CLI is installed
+    NSFileManager* fm = [NSFileManager defaultManager];
+    BOOL cliInstalled = [fm fileExistsAtPath:@"/usr/local/bin/inkwell"];
+    
+    if (!cliInstalled) {
+        NSMenuItem* installCLIItem = [toolsMenu addItemWithTitle:@"Install Command Line Tools" 
+                                                           action:@selector(installCommandLineTools:) 
+                                                    keyEquivalent:@""];
+        [installCLIItem setTarget:self];
+    } else {
+        NSMenuItem* installedItem = [toolsMenu addItemWithTitle:@"Command Line Tools Installed ✓" 
+                                                          action:nil 
+                                                   keyEquivalent:@""];
+        [installedItem setEnabled:NO];
+        
+        [toolsMenu addItem:[NSMenuItem separatorItem]];
+        
+        NSMenuItem* uninstallItem = [toolsMenu addItemWithTitle:@"Uninstall Command Line Tools" 
+                                                          action:@selector(uninstallCommandLineTools:) 
+                                                   keyEquivalent:@""];
+        [uninstallItem setTarget:self];
+    }
+}
+
+- (void)uninstallCommandLineTools:(id)sender {
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setMessageText:@"Uninstall Command Line Tools"];
+    [alert setInformativeText:@"This will remove the 'inkwell' command from /usr/local/bin.\n\nYou will be prompted for your password."];
+    [alert addButtonWithTitle:@"Uninstall"];
+    [alert addButtonWithTitle:@"Cancel"];
+    
+    NSModalResponse response = [alert runModal];
+    if (response == NSAlertFirstButtonReturn) {
+        // Use AppleScript to run the command with admin privileges
+        NSString* script = @"do shell script \"rm -f /usr/local/bin/inkwell\" with administrator privileges";
+        
+        NSDictionary* error = nil;
+        NSAppleScript* appleScript = [[NSAppleScript alloc] initWithSource:script];
+        NSAppleEventDescriptor* result = [appleScript executeAndReturnError:&error];
+        
+        if (result) {
+            // Verify the removal worked
+            NSFileManager* fm = [NSFileManager defaultManager];
+            if (![fm fileExistsAtPath:@"/usr/local/bin/inkwell"]) {
+                NSAlert* successAlert = [[NSAlert alloc] init];
+                [successAlert setMessageText:@"Uninstall Successful"];
+                [successAlert setInformativeText:@"Command line tools have been removed."];
+                [successAlert addButtonWithTitle:@"OK"];
+                [successAlert runModal];
+                
+                [self updateToolsMenu];
+            } else {
+                NSAlert* errorAlert = [[NSAlert alloc] init];
+                [errorAlert setMessageText:@"Uninstall Failed"];
+                [errorAlert setInformativeText:@"The command line tools could not be removed. Please try again."];
+                [errorAlert addButtonWithTitle:@"OK"];
+                [errorAlert runModal];
+            }
+        } else {
+            // User cancelled or there was an error
+            if (error[@"NSAppleScriptErrorNumber"] && [error[@"NSAppleScriptErrorNumber"] intValue] == -128) {
+                // User cancelled - do nothing
+            } else {
+                NSAlert* errorAlert = [[NSAlert alloc] init];
+                [errorAlert setMessageText:@"Uninstall Failed"];
+                [errorAlert setInformativeText:@"Could not remove command line tools.\n\nYou can manually remove them by running:\nsudo rm /usr/local/bin/inkwell"];
+                [errorAlert addButtonWithTitle:@"OK"];
+                [errorAlert runModal];
+            }
+        }
+    }
 }
 
 - (void)saveWindowFrame {

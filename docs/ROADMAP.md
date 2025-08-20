@@ -11,32 +11,31 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 1: Foundation Stabilization (Current - v0.3.0)
-**Timeline: 2-3 weeks**
+## Phase 1: Foundation Stabilization ✅ COMPLETED (v1.0.0 - v1.0.2)
 **Theme: "Rock Solid Basics"**
 
-### Goals
-- Fix all critical bugs in existing features
-- Ensure 100% reliability of core functionality
-- Complete test coverage for essential features
+### Achieved
+- ✅ Fixed critical dylib issue preventing app launch
+- ✅ TOC click navigation working
+- ✅ File watching auto-refresh functional
+- ✅ All keyboard shortcuts documented and working
+- ✅ Drag & drop fully implemented with visual effects
+- ✅ Command palette (Cmd+K) working
+- ✅ Search functionality (Cmd+F) with highlighting
+- ✅ Export to PDF/HTML working
+- ✅ Zoom controls implemented
+- ✅ Window persistence working
+- ✅ Command-line file opening (`inkwell file.md`)
 
-### Deliverables
-- [ ] Fix TOC click navigation (currently broken)
-- [ ] Verify and fix file watching auto-refresh
-- [ ] Test and document all keyboard shortcuts
-- [ ] Improve error handling and crash resilience
-- [ ] Add automated UI tests for core workflows
+### Outstanding Items
+- [ ] Re-enable test suite (currently disabled)
 - [ ] Performance baseline measurements
-
-### Success Metrics
-- Zero crashes in normal usage
-- All documented features working as advertised
-- 90%+ code coverage for core modules
+- [ ] CLI folder support (`inkwell .` to open current directory)
 
 ---
 
-## Phase 2: Essential Enhancements (v0.4.0)
-**Timeline: 3-4 weeks**
+## Phase 2: Essential Enhancements (Current - v1.1.0)
+**Timeline: 2-3 weeks**
 **Theme: "Daily Driver Ready"**
 
 ### Goals
@@ -45,13 +44,16 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 - Polish existing features
 
 ### Deliverables
+- [ ] CLI folder support - `inkwell .` opens folder browser
 - [ ] Tab support for multiple documents
-- [ ] Dark mode with system preference detection
+- [ ] Dark mode with system preference detection (partial support exists)
 - [ ] Back/forward navigation history
-- [ ] Improved search with highlighting persistence
-- [ ] Better TOC with collapsible sections
-- [ ] Recent files in dock menu
+- [ ] Search highlighting persistence across document changes
+- [ ] TOC with collapsible sections
+- [ ] Recent files in dock menu (basic support exists)
 - [ ] Preference pane for customization
+- [ ] Re-enable and update test suite
+- [ ] Code signing for easier distribution
 
 ### Success Metrics
 - Can replace Preview.app for daily markdown viewing
@@ -60,8 +62,8 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 3: Power User Features (v0.5.0)
-**Timeline: 4-5 weeks**
+## Phase 3: Power User Features (v1.2.0)
+**Timeline: 3-4 weeks**
 **Theme: "Professional Tool"**
 
 ### Goals
@@ -85,8 +87,8 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 4: Performance Revolution (v0.6.0)
-**Timeline: 4-6 weeks**
+## Phase 4: Performance Revolution (v1.3.0)
+**Timeline: 4-5 weeks**
 **Theme: "Blazing Fast"**
 
 ### Goals
@@ -110,8 +112,8 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 5: Ecosystem Integration (v0.7.0)
-**Timeline: 5-6 weeks**
+## Phase 5: Ecosystem Integration (v1.4.0)
+**Timeline: 4-5 weeks**
 **Theme: "Part of Your Workflow"**
 
 ### Goals
@@ -135,13 +137,13 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 6: Intelligence Layer (v1.0.0)
+## Phase 6: Intelligence Layer (v2.0.0)
 **Timeline: 6-8 weeks**
 **Theme: "Smart Viewer"**
 
 ### Goals
 - Add intelligent features
-- Achieve v1.0 stability
+- Major version milestone
 - Professional polish
 
 ### Deliverables
@@ -154,14 +156,14 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 - [ ] Professional documentation
 
 ### Success Metrics
-- Ready for production use
 - Mac App Store release
-- Positive reviews and ratings
+- 1000+ GitHub stars
 - Active user community
+- Plugin ecosystem started
 
 ---
 
-## Long-term Vision (Post v1.0)
+## Long-term Vision (Post v2.0)
 
 ### Potential Directions
 1. **Inkwell Pro** - Advanced features for professionals
@@ -194,7 +196,7 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 ### Distribution Channels
 1. Direct download from website
 2. Homebrew cask
-3. Mac App Store (after v1.0)
+3. Mac App Store (after v2.0)
 4. GitHub releases
 
 ---
@@ -250,3 +252,4 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 *This roadmap is a living document and will be updated based on user feedback, technical discoveries, and market conditions.*
 
 *Last updated: January 2025*
+*Current version: v1.0.2*
