@@ -22,7 +22,8 @@ find_library(WEBKIT_FRAMEWORK WebKit)
 
 # md4c library (will be added as external project)
 include(FetchContent)
-set(BUILD_SHARED_LIBS OFF)  # Force static linking
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries" FORCE)  # Force static linking
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)  # Honor normal variables in option()
 FetchContent_Declare(
     md4c
     GIT_REPOSITORY https://github.com/mity/md4c.git
