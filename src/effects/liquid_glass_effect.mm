@@ -2,6 +2,7 @@
 #import "../../include/effects/physics_world.h"
 #import "../../include/effects/animation_orchestrator.h"
 #import "../../include/effects/noise_generator.h"
+#import "../../include/effects/pass_through_view.h"
 #import <QuartzCore/QuartzCore.h>
 #import <CoreImage/CoreImage.h>
 #import <simd/simd.h>
@@ -120,7 +121,7 @@
     
     if (!self.overlayView && self.targetView) {
         // Create overlay
-        self.overlayView = [[[NSView alloc] initWithFrame:self.targetView.bounds] autorelease];
+        self.overlayView = [[[PassThroughView alloc] initWithFrame:self.targetView.bounds] autorelease];
         self.overlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         self.overlayView.wantsLayer = YES;
         self.overlayView.layer.backgroundColor = [[NSColor clearColor] CGColor];

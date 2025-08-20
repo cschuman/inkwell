@@ -1,4 +1,5 @@
 #import "../../include/effects/drag_effect_protocol.h"
+#import "../../include/effects/pass_through_view.h"
 #import <QuartzCore/QuartzCore.h>
 
 @interface ParticleEffect : BaseDragEffect
@@ -38,7 +39,7 @@
     // Create base overlay for drop zone indication
     if (!self.baseOverlay && self.targetView) {
         NSLog(@"ParticleEffect: Creating base overlay");
-        self.baseOverlay = [[NSView alloc] initWithFrame:self.targetView.bounds];
+        self.baseOverlay = [[PassThroughView alloc] initWithFrame:self.targetView.bounds];
         self.baseOverlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         self.baseOverlay.wantsLayer = YES;
         // More visible purple/pink tint

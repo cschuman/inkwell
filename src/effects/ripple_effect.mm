@@ -1,4 +1,5 @@
 #import "../../include/effects/drag_effect_protocol.h"
+#import "../../include/effects/pass_through_view.h"
 #import <QuartzCore/QuartzCore.h>
 
 @interface RippleEffect : BaseDragEffect
@@ -39,7 +40,7 @@
     // Create base overlay for drop zone indication
     if (!self.baseOverlay && self.targetView) {
         NSLog(@"RippleEffect: Creating base overlay");
-        self.baseOverlay = [[NSView alloc] initWithFrame:self.targetView.bounds];
+        self.baseOverlay = [[PassThroughView alloc] initWithFrame:self.targetView.bounds];
         self.baseOverlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         self.baseOverlay.wantsLayer = YES;
         // More visible cyan/teal tint
