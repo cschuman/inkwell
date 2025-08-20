@@ -19,6 +19,7 @@ extern "C" void showSimpleCommandPalette();
 @property (strong) NSViewController* mainViewController;
 - (void)createMenuBar;
 - (void)openDocument:(id)sender;
+- (void)openFolder:(id)sender;
 - (void)showCommandPalette:(id)sender;
 - (void)saveWindowFrame;
 - (void)restoreWindowFrame;
@@ -32,6 +33,24 @@ extern "C" void showSimpleCommandPalette();
 @end
 
 @implementation TOCItem
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _children = [NSMutableArray array];
+    }
+    return self;
+}
+@end
+
+@interface FileItem : NSObject
+@property (strong) NSString* name;
+@property (strong) NSString* path;
+@property (assign) BOOL isDirectory;
+@property (strong) NSMutableArray<FileItem*>* children;
+@property (strong) NSImage* icon;
+@end
+
+@implementation FileItem
 - (instancetype)init {
     self = [super init];
     if (self) {
@@ -176,9 +195,12 @@ extern "C" void showSimpleCommandPalette();
 @interface MarkdownViewController : NSViewController <NSDraggingDestination, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate, NSTextViewDelegate, CommandPaletteDelegate>
 - (void)applySyntaxHighlighting;
 - (void)openFile:(NSString*)path;
+- (void)openFolder:(NSString*)folderPath;
 - (void)updateAppearance;
 - (void)buildTOCFromDocument;
+- (void)buildFileTreeFromFolder:(NSString*)folderPath;
 - (void)toggleTOCSidebar;
+- (void)toggleFileBrowser;
 - (void)showSearchBar;
 - (void)hideSearchBar;
 - (void)showCommandPalette:(id)sender;
@@ -306,6 +328,12 @@ extern "C" void showSimpleCommandPalette();
     [fileMenu addItemWithTitle:@"Open..." 
                         action:@selector(openDocument:) 
                  keyEquivalent:@"o"];
+    
+    NSMenuItem* openFolderItem = [fileMenu addItemWithTitle:@"Open Folder..." 
+                                                      action:@selector(openFolder:) 
+                                               keyEquivalent:@"O"];
+    [openFolderItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagShift];
+    [openFolderItem setTarget:self];
     
     [fileMenu addItem:[NSMenuItem separatorItem]];
     
@@ -441,12 +469,18 @@ extern "C" void showSimpleCommandPalette();
     
     [viewMenu addItem:[NSMenuItem separatorItem]];
     
-    // TOC and Focus mode
+    // Sidebar controls
     NSMenuItem* tocItem = [viewMenu addItemWithTitle:@"Toggle Table of Contents" 
                                                action:@selector(toggleTOCSidebar) 
                                         keyEquivalent:@"t"];
     [tocItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
     [tocItem setTarget:nil];
+    
+    NSMenuItem* filesItem = [viewMenu addItemWithTitle:@"Toggle File Browser" 
+                                                 action:@selector(toggleFileBrowser) 
+                                          keyEquivalent:@"b"];
+    [filesItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
+    [filesItem setTarget:nil];
     
     NSMenuItem* focusItem = [viewMenu addItemWithTitle:@"Toggle Focus Mode" 
                                                  action:@selector(toggleFocusMode) 
@@ -557,6 +591,24 @@ extern "C" void showSimpleCommandPalette();
             NSURL* selectedFile = [openPanel URL];
             MarkdownViewController* vc = (MarkdownViewController*)self.mainViewController;
             [vc openFile:[selectedFile path]];
+        }
+    }];
+}
+
+- (void)openFolder:(id)sender {
+    NSOpenPanel* openPanel = [NSOpenPanel openPanel];
+    [openPanel setCanChooseFiles:NO];
+    [openPanel setCanChooseDirectories:YES];
+    [openPanel setAllowsMultipleSelection:NO];
+    [openPanel setMessage:@"Select a folder to browse markdown files"];
+    [openPanel setPrompt:@"Open Folder"];
+    
+    [openPanel beginWithCompletionHandler:^(NSInteger result) {
+        if (result == NSModalResponseOK) {
+            NSURL* selectedFolder = [openPanel URL];
+            MarkdownViewController* vc = (MarkdownViewController*)self.mainViewController;
+            [vc openFolder:[selectedFolder path]];
+            [vc toggleFileBrowser];
         }
     }];
 }
@@ -820,6 +872,14 @@ extern "C" void showSimpleCommandPalette();
     NSScrollView* _tocScrollView;
     NSMutableArray* _tocItems;
     
+    // File browser
+    NSSegmentedControl* _sidebarModeSelector;
+    NSOutlineView* _fileOutlineView;
+    NSScrollView* _fileScrollView;
+    NSMutableArray* _fileItems;
+    NSString* _currentFolderPath;
+    BOOL _showingFileBrowser;
+    
     // Font size management
     CGFloat _currentFontSize;
     CGFloat _baseFontSize;
@@ -1007,31 +1067,75 @@ extern "C" void showSimpleCommandPalette();
     [_splitView setVertical:YES];
     _splitView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     
+    // Create sidebar container
+    NSView* sidebarContainer = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height)];
+    
+    // Create segmented control for switching between TOC and Files
+    _sidebarModeSelector = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(10, splitFrame.size.height - 35, 230, 25)];
+    [_sidebarModeSelector setSegmentCount:2];
+    [_sidebarModeSelector setLabel:@"Outline" forSegment:0];
+    [_sidebarModeSelector setLabel:@"Files" forSegment:1];
+    [_sidebarModeSelector setSelectedSegment:0];
+    [_sidebarModeSelector setTarget:self];
+    [_sidebarModeSelector setAction:@selector(sidebarModeChanged:)];
+    _sidebarModeSelector.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
+    
     // Create TOC outline view
-    _tocScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height)];
+    _tocScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
     [_tocScrollView setHasVerticalScroller:YES];
     [_tocScrollView setAutohidesScrollers:YES];
+    _tocScrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     
-    _tocOutlineView = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height)];
+    _tocOutlineView = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
     [_tocOutlineView setHeaderView:nil];
     [_tocOutlineView setIndentationPerLevel:16];
     [_tocOutlineView setFloatsGroupRows:NO];
     
-    NSTableColumn* column = [[NSTableColumn alloc] initWithIdentifier:@"title"];
-    [column setWidth:180];
-    [_tocOutlineView addTableColumn:column];
-    [_tocOutlineView setOutlineTableColumn:column];
+    NSTableColumn* tocColumn = [[NSTableColumn alloc] initWithIdentifier:@"title"];
+    [tocColumn setWidth:230];
+    [_tocOutlineView addTableColumn:tocColumn];
+    [_tocOutlineView setOutlineTableColumn:tocColumn];
     
     [_tocOutlineView setDataSource:self];
     [_tocOutlineView setDelegate:self];
     [_tocOutlineView setTarget:self];
-    [_tocOutlineView setAction:@selector(tocItemClicked:)];  // Single click
-    [_tocOutlineView setDoubleAction:@selector(tocItemClicked:)];  // Also handle double click
+    [_tocOutlineView setAction:@selector(tocItemClicked:)];
+    [_tocOutlineView setDoubleAction:@selector(tocItemClicked:)];
     
     [_tocScrollView setDocumentView:_tocOutlineView];
     
-    // Don't hide TOC with setHidden - control visibility with split position
-    // [_tocScrollView setHidden:YES];  // Removed - causes issues with split view
+    // Create file browser outline view
+    NSScrollView* fileScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
+    [fileScrollView setHasVerticalScroller:YES];
+    [fileScrollView setAutohidesScrollers:YES];
+    fileScrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    
+    _fileOutlineView = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
+    [_fileOutlineView setHeaderView:nil];
+    [_fileOutlineView setIndentationPerLevel:16];
+    [_fileOutlineView setFloatsGroupRows:NO];
+    
+    NSTableColumn* fileColumn = [[NSTableColumn alloc] initWithIdentifier:@"name"];
+    [fileColumn setWidth:230];
+    [_fileOutlineView addTableColumn:fileColumn];
+    [_fileOutlineView setOutlineTableColumn:fileColumn];
+    
+    [_fileOutlineView setDataSource:self];
+    [_fileOutlineView setDelegate:self];
+    [_fileOutlineView setTarget:self];
+    [_fileOutlineView setAction:@selector(fileItemClicked:)];
+    [_fileOutlineView setDoubleAction:@selector(fileItemClicked:)];
+    
+    [fileScrollView setDocumentView:_fileOutlineView];
+    
+    // Add views to sidebar container
+    [sidebarContainer addSubview:_sidebarModeSelector];
+    [sidebarContainer addSubview:_tocScrollView];
+    [sidebarContainer addSubview:fileScrollView];
+    
+    // Initially hide file browser
+    [fileScrollView setHidden:YES];
+    _showingFileBrowser = NO;
     
     // Create main content scroll view  
     NSRect scrollFrame = NSMakeRect(0, 0, frame.size.width, splitFrame.size.height);
@@ -1049,11 +1153,14 @@ extern "C" void showSimpleCommandPalette();
     [_scrollView addSubview:contentBackground positioned:NSWindowBelow relativeTo:nil];
     
     // Add views to split view
-    [_splitView addSubview:_tocScrollView];
+    [_splitView addSubview:sidebarContainer];
     [_splitView addSubview:_scrollView];
     
-    // Set initial split position
+    // Set initial split position (hide sidebar initially)
     [_splitView setPosition:0 ofDividerAtIndex:0];
+    
+    // Store reference to file scroll view
+    _fileScrollView = fileScrollView;
     
     [view addSubview:_splitView];
     
@@ -1482,8 +1589,10 @@ extern "C" void showSimpleCommandPalette();
     // Initialize effects system
     [self setupEffectsSystem];
     
-    // Check if we have a file to open from command line
+    // Check if we have a file or folder to open from command line
     NSString* fileToOpen = [[NSUserDefaults standardUserDefaults] stringForKey:@"FileToOpenAtLaunch"];
+    NSString* folderToOpen = [[NSUserDefaults standardUserDefaults] stringForKey:@"FolderToOpenAtLaunch"];
+    
     if (fileToOpen) {
         // Clear the flag
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"FileToOpenAtLaunch"];
@@ -1493,6 +1602,19 @@ extern "C" void showSimpleCommandPalette();
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             NSLog(@"Opening command-line file: %@", fileToOpen);
             [self openFile:fileToOpen];
+        });
+    } else if (folderToOpen) {
+        // Clear the flag
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"FolderToOpenAtLaunch"];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        
+        // Open the folder browser after a short delay
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSLog(@"Opening command-line folder: %@", folderToOpen);
+            AppDelegate* appDelegate = (AppDelegate*)[NSApp delegate];
+            MarkdownViewController* vc = (MarkdownViewController*)appDelegate.mainViewController;
+            [vc openFolder:folderToOpen];
+            [vc toggleFileBrowser];
         });
     }
     
@@ -2296,18 +2418,191 @@ extern "C" void showSimpleCommandPalette();
 }
 
 - (void)toggleTOCSidebar {
-    // Check if TOC is visible by checking the frame width
-    NSRect tocFrame = [_tocScrollView frame];
+    // Get the sidebar container (first subview of split view)
+    NSView* sidebarContainer = [[_splitView subviews] firstObject];
+    BOOL sidebarCollapsed = [_splitView isSubviewCollapsed:sidebarContainer];
     
-    if (tocFrame.size.width < 10) {  // TOC is hidden
-        // Show TOC
-        [_splitView setPosition:200 ofDividerAtIndex:0];
+    if (sidebarCollapsed) {  // Sidebar is hidden
+        // Show sidebar with TOC
+        [_splitView setPosition:250 ofDividerAtIndex:0];
+        [_sidebarModeSelector setSelectedSegment:0];
+        [self sidebarModeChanged:nil];
         
         // Build/refresh TOC
         [self buildTOCFromDocument];
+        NSLog(@"Showing TOC sidebar");
     } else {
-        // Hide TOC
+        // Hide sidebar
         [_splitView setPosition:0 ofDividerAtIndex:0];
+        NSLog(@"Hiding TOC sidebar");
+    }
+}
+
+- (void)toggleFileBrowser {
+    // Get current position of divider
+    CGFloat currentPosition = NSWidth([[[_splitView subviews] firstObject] frame]);
+    NSLog(@"Current sidebar width: %f", currentPosition);
+    
+    if (currentPosition < 10) {
+        // Sidebar is hidden - show it with files
+        [_splitView setPosition:250 ofDividerAtIndex:0];
+        [_sidebarModeSelector setSelectedSegment:1];
+        [self sidebarModeChanged:nil];
+        NSLog(@"Showing file browser sidebar (was hidden)");
+    } else if (_showingFileBrowser) {
+        // Hide sidebar if already showing files
+        [_splitView setPosition:0 ofDividerAtIndex:0];
+        NSLog(@"Hiding file browser sidebar");
+    } else {
+        // Sidebar visible but showing TOC - switch to files
+        [_sidebarModeSelector setSelectedSegment:1];
+        [self sidebarModeChanged:nil];
+        NSLog(@"Switching from TOC to file browser");
+    }
+}
+
+- (void)sidebarModeChanged:(id)sender {
+    NSInteger selectedSegment = [_sidebarModeSelector selectedSegment];
+    NSLog(@"Sidebar mode changed to: %@", selectedSegment == 0 ? @"TOC" : @"Files");
+    
+    if (selectedSegment == 0) {  // TOC
+        [_tocScrollView setHidden:NO];
+        [_fileScrollView setHidden:YES];
+        _showingFileBrowser = NO;
+        [self buildTOCFromDocument];
+    } else {  // Files
+        [_tocScrollView setHidden:YES];
+        [_fileScrollView setHidden:NO];
+        _showingFileBrowser = YES;
+        NSLog(@"File browser activated, current folder: %@", _currentFolderPath);
+        
+        // If no folder is open, open the current file's directory
+        if (!_currentFolderPath) {
+            if (_currentFilePath) {
+                NSString* folderPath = [_currentFilePath stringByDeletingLastPathComponent];
+                NSLog(@"Opening folder from current file path: %@", folderPath);
+                [self openFolder:folderPath];
+            } else if (_currentDocument) {
+                NSString* filePath = _currentFilePath;
+                NSString* folderPath = [filePath stringByDeletingLastPathComponent];
+                NSLog(@"Opening folder from document: %@", folderPath);
+                [self openFolder:folderPath];
+            }
+        }
+    }
+}
+
+- (void)openFolder:(NSString*)folderPath {
+    NSLog(@"openFolder called with path: %@", folderPath);
+    _currentFolderPath = folderPath;
+    [self buildFileTreeFromFolder:folderPath];
+}
+
+- (void)buildFileTreeFromFolder:(NSString*)folderPath {
+    if (!folderPath) {
+        NSLog(@"buildFileTreeFromFolder: folderPath is nil");
+        return;
+    }
+    
+    NSLog(@"Building file tree for folder: %@", folderPath);
+    _fileItems = [NSMutableArray array];
+    
+    NSFileManager* fm = [NSFileManager defaultManager];
+    NSError* error = nil;
+    
+    // Create root item for the folder
+    FileItem* rootItem = [[FileItem alloc] init];
+    rootItem.name = [folderPath lastPathComponent];
+    rootItem.path = folderPath;
+    rootItem.isDirectory = YES;
+    
+    // Scan directory
+    [self scanDirectory:folderPath intoItem:rootItem];
+    
+    [_fileItems addObject:rootItem];
+    NSLog(@"File tree built with %lu items", (unsigned long)[rootItem.children count]);
+    [_fileOutlineView reloadData];
+    [_fileOutlineView expandItem:rootItem];
+}
+
+- (void)scanDirectory:(NSString*)path intoItem:(FileItem*)parentItem {
+    NSFileManager* fm = [NSFileManager defaultManager];
+    NSError* error = nil;
+    NSArray* contents = [fm contentsOfDirectoryAtPath:path error:&error];
+    
+    if (error) {
+        NSLog(@"Error scanning directory %@: %@", path, error);
+        return;
+    }
+    
+    // Sort contents alphabetically, directories first
+    NSArray* sortedContents = [contents sortedArrayUsingComparator:^NSComparisonResult(NSString* obj1, NSString* obj2) {
+        NSString* path1 = [path stringByAppendingPathComponent:obj1];
+        NSString* path2 = [path stringByAppendingPathComponent:obj2];
+        
+        BOOL isDir1, isDir2;
+        [fm fileExistsAtPath:path1 isDirectory:&isDir1];
+        [fm fileExistsAtPath:path2 isDirectory:&isDir2];
+        
+        if (isDir1 && !isDir2) return NSOrderedAscending;
+        if (!isDir1 && isDir2) return NSOrderedDescending;
+        
+        return [obj1 localizedStandardCompare:obj2];
+    }];
+    
+    for (NSString* itemName in sortedContents) {
+        // Skip hidden files
+        if ([itemName hasPrefix:@"."]) continue;
+        
+        NSString* itemPath = [path stringByAppendingPathComponent:itemName];
+        BOOL isDirectory;
+        [fm fileExistsAtPath:itemPath isDirectory:&isDirectory];
+        
+        FileItem* item = [[FileItem alloc] init];
+        item.name = itemName;
+        item.path = itemPath;
+        item.isDirectory = isDirectory;
+        
+        if (isDirectory) {
+            // Only scan subdirectories one level deep for performance
+            item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:NSFileTypeForHFSTypeCode(kGenericFolderIcon)];
+            // Don't recursively scan for now - can be expanded on demand
+        } else {
+            // Only include markdown files
+            NSString* extension = [[itemName pathExtension] lowercaseString];
+            NSArray* markdownExtensions = @[@"md", @"markdown", @"mdown", @"mkd", @"mdwn"];
+            
+            if (![markdownExtensions containsObject:extension]) continue;
+            
+            item.icon = [[NSWorkspace sharedWorkspace] iconForFileType:extension];
+        }
+        
+        [parentItem.children addObject:item];
+    }
+}
+
+- (void)fileItemClicked:(id)sender {
+    NSInteger clickedRow = [_fileOutlineView clickedRow];
+    if (clickedRow < 0) return;
+    
+    FileItem* item = [_fileOutlineView itemAtRow:clickedRow];
+    if (!item) return;
+    
+    if (item.isDirectory) {
+        // Toggle expansion
+        if ([_fileOutlineView isItemExpanded:item]) {
+            [_fileOutlineView collapseItem:item];
+        } else {
+            // Scan directory if not already done
+            if ([item.children count] == 0) {
+                [self scanDirectory:item.path intoItem:item];
+                [_fileOutlineView reloadItem:item reloadChildren:YES];
+            }
+            [_fileOutlineView expandItem:item];
+        }
+    } else {
+        // Open the markdown file
+        [self openFile:item.path];
     }
 }
 
@@ -2359,27 +2654,50 @@ extern "C" void showSimpleCommandPalette();
 
 - (NSInteger)outlineView:(NSOutlineView*)outlineView numberOfChildrenOfItem:(id)item {
     if (item == nil) {
-        return [_tocItems count];
+        // Root level - check which outline view we're dealing with
+        if (outlineView == _fileOutlineView) {
+            return [_fileItems count];
+        } else {
+            return [_tocItems count];
+        }
     }
+    
     if ([item isKindOfClass:[TOCItem class]]) {
         return [[(TOCItem*)item children] count];
+    } else if ([item isKindOfClass:[FileItem class]]) {
+        FileItem* fileItem = (FileItem*)item;
+        return fileItem.isDirectory ? [fileItem.children count] : 0;
     }
+    
     return 0;
 }
 
 - (id)outlineView:(NSOutlineView*)outlineView child:(NSInteger)index ofItem:(id)item {
     if (item == nil) {
-        return [_tocItems objectAtIndex:index];
+        // Root level - check which outline view we're dealing with
+        if (outlineView == _fileOutlineView) {
+            return [_fileItems objectAtIndex:index];
+        } else {
+            return [_tocItems objectAtIndex:index];
+        }
     }
+    
     if ([item isKindOfClass:[TOCItem class]]) {
         return [[(TOCItem*)item children] objectAtIndex:index];
+    } else if ([item isKindOfClass:[FileItem class]]) {
+        FileItem* fileItem = (FileItem*)item;
+        return fileItem.isDirectory ? [fileItem.children objectAtIndex:index] : nil;
     }
+    
     return nil;
 }
 
 - (BOOL)outlineView:(NSOutlineView*)outlineView isItemExpandable:(id)item {
     if ([item isKindOfClass:[TOCItem class]]) {
         return [[(TOCItem*)item children] count] > 0;
+    } else if ([item isKindOfClass:[FileItem class]]) {
+        FileItem* fileItem = (FileItem*)item;
+        return fileItem.isDirectory && [fileItem.children count] > 0;
     }
     return NO;
 }
@@ -2390,7 +2708,7 @@ extern "C" void showSimpleCommandPalette();
     [textField setBordered:NO];
     [textField setBackgroundColor:[NSColor clearColor]];
     
-    if ([item isKindOfClass:[TOCItem class]]) {
+    if (outlineView == _tocOutlineView && [item isKindOfClass:[TOCItem class]]) {
         TOCItem* tocItem = (TOCItem*)item;
         
         // Format based on heading level
@@ -2409,9 +2727,53 @@ extern "C" void showSimpleCommandPalette();
         
         [textField setFont:font];
         [textField setStringValue:tocItem.title];
+    } else if (outlineView == _fileOutlineView && [item isKindOfClass:[FileItem class]]) {
+        FileItem* fileItem = (FileItem*)item;
+        [textField setFont:[NSFont systemFontOfSize:12]];
+        [textField setStringValue:fileItem.name];
+        
+        // Create table cell view with icon
+        NSTableCellView* cellView = [[NSTableCellView alloc] init];
+        cellView.textField = textField;
+        
+        if (fileItem.icon) {
+            NSImageView* imageView = [[NSImageView alloc] initWithFrame:NSMakeRect(2, 2, 16, 16)];
+            imageView.image = fileItem.icon;
+            cellView.imageView = imageView;
+            [cellView addSubview:imageView];
+            [cellView addSubview:textField];
+            
+            // Adjust text field position to make room for icon
+            textField.frame = NSMakeRect(22, 0, 200, 20);
+        }
+        
+        return cellView;
     }
     
     return textField;
+}
+
+- (void)outlineViewSelectionDidChange:(NSNotification*)notification {
+    NSOutlineView* outlineView = [notification object];
+    NSInteger selectedRow = [outlineView selectedRow];
+    
+    if (selectedRow >= 0) {
+        id item = [outlineView itemAtRow:selectedRow];
+        
+        if ([item isKindOfClass:[TOCItem class]]) {
+            // Handle TOC item click
+            TOCItem* tocItem = (TOCItem*)item;
+            [self scrollToHeading:tocItem];
+        } else if ([item isKindOfClass:[FileItem class]]) {
+            // Handle file item click
+            FileItem* fileItem = (FileItem*)item;
+            if (!fileItem.isDirectory) {
+                // Open the markdown file
+                AppDelegate* appDelegate = (AppDelegate*)[NSApp delegate];
+                [appDelegate openFile:fileItem.path];
+            }
+        }
+    }
 }
 
 // MARK: - Effects System
@@ -3381,6 +3743,7 @@ extern "C" void showSimpleCommandPalette();
     _frameCount++;
 }
 
+
 @end
 
 // MTKViewDelegate methods commented out for now
@@ -3422,22 +3785,38 @@ int main(int argc, char* argv[]) {
     @autoreleasepool {
         NSLog(@"Inkwell starting...");
         
-        // Check for command-line file argument
-        NSString* fileToOpen = nil;
+        // Check for command-line file or folder argument
+        NSString* pathToOpen = nil;
+        BOOL isFolder = NO;
+        
         if (argc > 1) {
-            fileToOpen = [NSString stringWithUTF8String:argv[1]];
-            NSLog(@"Command-line file specified: %@", fileToOpen);
+            NSString* arg = [NSString stringWithUTF8String:argv[1]];
+            NSLog(@"Command-line argument: %@", arg);
             
-            // Convert to absolute path if relative
-            if (![fileToOpen isAbsolutePath]) {
-                NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
-                fileToOpen = [cwd stringByAppendingPathComponent:fileToOpen];
-            }
-            
-            // Check if file exists
-            if (![[NSFileManager defaultManager] fileExistsAtPath:fileToOpen]) {
-                NSLog(@"Error: File not found: %@", fileToOpen);
-                fileToOpen = nil;
+            // Handle special case: "." means current directory
+            if ([arg isEqualToString:@"."]) {
+                pathToOpen = [[NSFileManager defaultManager] currentDirectoryPath];
+                isFolder = YES;
+                NSLog(@"Opening current directory: %@", pathToOpen);
+            } else {
+                // Convert to absolute path if relative
+                if (![arg isAbsolutePath]) {
+                    NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+                    pathToOpen = [cwd stringByAppendingPathComponent:arg];
+                } else {
+                    pathToOpen = arg;
+                }
+                
+                // Check if path exists and determine if it's a file or folder
+                NSFileManager* fm = [NSFileManager defaultManager];
+                BOOL isDirectory;
+                if ([fm fileExistsAtPath:pathToOpen isDirectory:&isDirectory]) {
+                    isFolder = isDirectory;
+                    NSLog(@"Path exists - %@: %@", isFolder ? @"Folder" : @"File", pathToOpen);
+                } else {
+                    NSLog(@"Error: Path not found: %@", pathToOpen);
+                    pathToOpen = nil;
+                }
             }
         }
         
@@ -3448,9 +3827,13 @@ int main(int argc, char* argv[]) {
             AppDelegate* delegate = [[AppDelegate alloc] init];
             NSLog(@"AppDelegate created");
             
-            // Store the file path to open after window is ready
-            if (fileToOpen) {
-                [[NSUserDefaults standardUserDefaults] setObject:fileToOpen forKey:@"FileToOpenAtLaunch"];
+            // Store the path to open after window is ready
+            if (pathToOpen) {
+                if (isFolder) {
+                    [[NSUserDefaults standardUserDefaults] setObject:pathToOpen forKey:@"FolderToOpenAtLaunch"];
+                } else {
+                    [[NSUserDefaults standardUserDefaults] setObject:pathToOpen forKey:@"FileToOpenAtLaunch"];
+                }
                 [[NSUserDefaults standardUserDefaults] synchronize];
             }
             
