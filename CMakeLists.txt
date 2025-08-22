@@ -128,6 +128,8 @@ set_target_properties(Inkwell PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.coreymd.inkwell"
+    MACOSX_BUNDLE_ICON_FILE "Inkwell"
+    RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/resources/Inkwell.icns"
 )
 
 
