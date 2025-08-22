@@ -1106,8 +1106,9 @@ extern "C" void showSimpleCommandPalette();
         NSImage* folderIcon = [NSImage imageWithSystemSymbolName:@"folder" accessibilityDescription:@"Files"];
         if (folderIcon) {
             [folderIcon setSize:NSMakeSize(14, 14)];
+            NSTextAttachmentCell* attachmentCell = [[NSTextAttachmentCell alloc] initImageCell:folderIcon];
             NSTextAttachment* attachment = [[NSTextAttachment alloc] init];
-            attachment.image = folderIcon;
+            [attachment setAttachmentCell:attachmentCell];
             [filesTitle appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
             [filesTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
         }
@@ -1160,8 +1161,9 @@ extern "C" void showSimpleCommandPalette();
         NSImage* outlineIcon = [NSImage imageWithSystemSymbolName:@"list.bullet.indent" accessibilityDescription:@"Outline"];
         if (outlineIcon) {
             [outlineIcon setSize:NSMakeSize(14, 14)];
+            NSTextAttachmentCell* attachmentCell = [[NSTextAttachmentCell alloc] initImageCell:outlineIcon];
             NSTextAttachment* attachment = [[NSTextAttachment alloc] init];
-            attachment.image = outlineIcon;
+            [attachment setAttachmentCell:attachmentCell];
             [outlineTitle appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
             [outlineTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
         }
