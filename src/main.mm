@@ -252,21 +252,66 @@ extern "C" void showSimpleCommandPalette();
     
     // Create main window with modern styling
     NSRect frame = NSMakeRect(0, 0, 1000, 700);
+    
+    // Ultra-minimal window style options - uncomment one:
+    
+    // Option 1: Standard window with all buttons
+    // NSWindowStyleMask style = NSWindowStyleMaskTitled | 
+    //                          NSWindowStyleMaskClosable | 
+    //                          NSWindowStyleMaskMiniaturizable | 
+    //                          NSWindowStyleMaskResizable |
+    //                          NSWindowStyleMaskFullSizeContentView;
+    
+    // Option 2: Ultra-minimal with only close button
     NSWindowStyleMask style = NSWindowStyleMaskTitled | 
-                             NSWindowStyleMaskClosable | 
-                             NSWindowStyleMaskMiniaturizable | 
+                             NSWindowStyleMaskClosable |  // Need this for close button to work
                              NSWindowStyleMaskResizable |
                              NSWindowStyleMaskFullSizeContentView;
+    
+    // Option 3: Completely borderless window (no title bar at all)
+    // NSWindowStyleMask style = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
     
     self.window = [[NSWindow alloc] initWithContentRect:frame
                                               styleMask:style
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     
-    NSString* title = [NSString stringWithFormat:@"Inkwell v%s (Build %d)", 
-                       mdviewer::getVersionString(), 
-                       mdviewer::getBuildNumber()];
-    [self.window setTitle:title];
+    // Set a simple title or hide it
+    [self.window setTitle:@""];  // Empty title for ultra-minimal look
+    
+    // Additional customization for ultra-minimal look
+    if (style & NSWindowStyleMaskFullSizeContentView) {
+        // Make title bar transparent
+        self.window.titlebarAppearsTransparent = YES;
+        
+        // Hide title text for cleaner look
+        self.window.titleVisibility = NSWindowTitleHidden;
+        
+        // CUSTOMIZE THE WINDOW BUTTONS
+        NSButton* closeButton = [self.window standardWindowButton:NSWindowCloseButton];
+        NSButton* miniaturizeButton = [self.window standardWindowButton:NSWindowMiniaturizeButton];
+        NSButton* zoomButton = [self.window standardWindowButton:NSWindowZoomButton];
+        
+        // Hide minimize and zoom buttons
+        [miniaturizeButton setHidden:YES];
+        [zoomButton setHidden:YES];
+        
+        // Keep close button visible and functional
+        [closeButton setAlphaValue:0.6];  // More visible but still subtle
+        [closeButton setEnabled:YES];  // Ensure it's enabled
+    }
+    
+    // For borderless windows, make them movable by background
+    if (style & NSWindowStyleMaskBorderless) {
+        [self.window setMovableByWindowBackground:YES];
+        [self.window setOpaque:NO];
+        [self.window setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:0.98]];
+    }
+    
+    // Hide window buttons after creation (another approach)
+    // [[self.window standardWindowButton:NSWindowCloseButton] setHidden:YES];
+    // [[self.window standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+    // [[self.window standardWindowButton:NSWindowZoomButton] setHidden:YES];
     
     // Set window delegate for position persistence
     [self.window setDelegate:self];
@@ -281,8 +326,8 @@ extern "C" void showSimpleCommandPalette();
     
     // Modern macOS window appearance
     self.window.titlebarAppearsTransparent = YES;
-    // Show the title so we can see version info
-    self.window.titleVisibility = NSWindowTitleVisible;
+    // Hide the title for ultra-minimal look
+    self.window.titleVisibility = NSWindowTitleHidden;
     self.window.backgroundColor = [NSColor windowBackgroundColor];
     self.window.minSize = NSMakeSize(600, 400);
     
@@ -296,6 +341,7 @@ extern "C" void showSimpleCommandPalette();
     // Create view controller
     self.mainViewController = [[MarkdownViewController alloc] init];
     [self.window setContentViewController:self.mainViewController];
+    
     
     // Enable drag and drop on window
     [self.window registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
@@ -3832,7 +3878,9 @@ extern "C" void showSimpleCommandPalette();
     
     // Format the status bar
     NSString* status = [NSString stringWithFormat:
-        @"[📄 %@ | %@ | %lu lines] [Parse: %.0fms | Render: %.0fms | FPS: %.0f] [Memory: %@ | Cache: %.0f%%] [CPU: %.0f%%]",
+        @"Inkwell v%s (Build %d) | %@ | %@ | %lu lines | Parse: %.0fms | Render: %.0fms | FPS: %.0f | Memory: %@ | Cache: %.0f%% | CPU: %.0f%%",
+        mdviewer::getVersionString(),
+        mdviewer::getBuildNumber(),
         filename,
         fileSizeStr, 
         (unsigned long)_currentLineCount,
