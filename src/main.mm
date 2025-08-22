@@ -97,8 +97,7 @@ extern "C" void showSimpleCommandPalette();
         [self registerForDraggedTypes:@[
             NSPasteboardTypeFileURL,
             NSPasteboardTypeURL,
-            (NSString*)kUTTypeFileURL,  // Legacy UTI
-            NSFilenamesPboardType        // Legacy but sometimes needed
+            (NSString*)kUTTypeFileURL  // Legacy UTI
         ]];
         NSLog(@"KeyHandlingView: Registered for drag types");
     }
@@ -739,7 +738,7 @@ extern "C" void showSimpleCommandPalette();
                     // Copy command to clipboard
                     NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
                     [pasteboard clearContents];
-                    [pasteboard setString:command forType:NSStringPboardType];
+                    [pasteboard setString:command forType:NSPasteboardTypeString];
                     
                     // Show confirmation
                     NSAlert* copiedAlert = [[NSAlert alloc] init];
@@ -3182,16 +3181,15 @@ extern "C" void showSimpleCommandPalette();
         NSLog(@"Got URLs via readObjectsForClasses: %@", urls);
     }
     
-    // Method 2: Legacy filenames approach (sometimes needed for Finder)
+    // Method 2: Try getting file URLs with different options
     if (!urls || urls.count == 0) {
-        NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
-        if (filenames) {
-            NSMutableArray* fileURLs = [NSMutableArray array];
-            for (NSString* filename in filenames) {
-                [fileURLs addObject:[NSURL fileURLWithPath:filename]];
-            }
-            urls = fileURLs;
-            NSLog(@"Got URLs via NSFilenamesPboardType: %@", urls);
+        NSDictionary* options = @{
+            NSPasteboardURLReadingFileURLsOnlyKey: @YES,
+            NSPasteboardURLReadingContentsConformToTypesKey: @[@"public.item"]
+        };
+        urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:options];
+        if (urls && urls.count > 0) {
+            NSLog(@"Got URLs via readObjectsForClasses with options: %@", urls);
         }
     }
     
@@ -3267,16 +3265,13 @@ extern "C" void showSimpleCommandPalette();
         urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:nil];
     }
     
-    // Method 2: Legacy filenames approach
+    // Method 2: Try getting file URLs with different options
     if (!urls || urls.count == 0) {
-        NSArray* filenames = [pasteboard propertyListForType:NSFilenamesPboardType];
-        if (filenames && filenames.count > 0) {
-            NSMutableArray* fileURLs = [NSMutableArray array];
-            for (NSString* filename in filenames) {
-                [fileURLs addObject:[NSURL fileURLWithPath:filename]];
-            }
-            urls = fileURLs;
-        }
+        NSDictionary* options = @{
+            NSPasteboardURLReadingFileURLsOnlyKey: @YES,
+            NSPasteboardURLReadingContentsConformToTypesKey: @[@"public.item"]
+        };
+        urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:options];
     }
     
     if ([urls count] > 0) {
