@@ -217,6 +217,7 @@ extern "C" void showSimpleCommandPalette();
 - (void)applySyntaxHighlighting;
 - (void)openFile:(NSString*)path;
 - (void)openFolder:(NSString*)folderPath;
+- (void)scrollToHeading:(TOCItem*)tocItem;
 - (void)updateAppearance;
 - (void)buildTOCFromDocument;
 - (void)buildFileTreeFromFolder:(NSString*)folderPath;
@@ -1564,15 +1565,47 @@ extern "C" void showSimpleCommandPalette();
         content = @"";
     }
     
+    // Handle Obsidian-style YAML frontmatter
+    NSString* processedContent = content;
+    NSString* frontmatterContent = nil;
+    
+    // Check if content starts with "---\n"
+    if ([content hasPrefix:@"---\n"] || [content hasPrefix:@"---\r\n"]) {
+        // Find the closing --- delimiter
+        NSRange searchRange = NSMakeRange(3, [content length] - 3);
+        NSRange endDelimiter = [content rangeOfString:@"\n---\n" options:0 range:searchRange];
+        if (endDelimiter.location == NSNotFound) {
+            endDelimiter = [content rangeOfString:@"\r\n---\r\n" options:0 range:searchRange];
+        }
+        if (endDelimiter.location == NSNotFound) {
+            endDelimiter = [content rangeOfString:@"\n---\r\n" options:0 range:searchRange];
+        }
+        
+        if (endDelimiter.location != NSNotFound) {
+            // Extract frontmatter (including delimiters)
+            NSUInteger frontmatterEnd = endDelimiter.location + endDelimiter.length;
+            frontmatterContent = [content substringToIndex:frontmatterEnd];
+            
+            // Remove frontmatter from content for parsing
+            processedContent = [content substringFromIndex:frontmatterEnd];
+            
+            // Add a note about frontmatter being hidden (optional)
+            NSString* frontmatterNote = @"*[YAML frontmatter hidden - contains document metadata]*\n\n";
+            processedContent = [frontmatterNote stringByAppendingString:processedContent];
+            
+            NSLog(@"Detected YAML frontmatter (%lu characters)", (unsigned long)[frontmatterContent length]);
+        }
+    }
+    
     // Get file stats
     NSDictionary* fileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
     _currentFileSize = [fileAttributes[NSFileSize] unsignedIntegerValue];
-    _currentLineCount = [[content componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] count];
+    _currentLineCount = [[processedContent componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] count];
     
     // Try to parse markdown with error handling
     NSDate* parseStart = [NSDate date];
     @try {
-        const char* markdownCStr = [content UTF8String];
+        const char* markdownCStr = [processedContent UTF8String];
         if (markdownCStr && strlen(markdownCStr) > 0) {
             std::string markdown(markdownCStr);
             _currentDocument = _parser->parse(markdown);
@@ -2734,6 +2767,30 @@ extern "C" void showSimpleCommandPalette();
     }
 }
 
+- (void)scrollToHeading:(TOCItem*)tocItem {
+    if (!tocItem || !tocItem.title) return;
+    
+    NSString* headingText = tocItem.title;
+    NSString* textViewContent = [_textView string];
+    
+    // Find the heading in the text view
+    NSRange searchRange = NSMakeRange(0, [textViewContent length]);
+    NSRange foundRange = [textViewContent rangeOfString:headingText 
+                                                options:NSCaseInsensitiveSearch 
+                                                  range:searchRange];
+    
+    if (foundRange.location != NSNotFound) {
+        // Scroll to the heading
+        [_textView scrollRangeToVisible:foundRange];
+        
+        // Optionally highlight the heading briefly
+        [_textView setSelectedRange:foundRange];
+        
+        // Flash the selection
+        [_textView showFindIndicatorForRange:foundRange];
+    }
+}
+
 - (void)tocItemClicked:(id)sender {
     NSInteger clickedRow = [_tocOutlineView clickedRow];
     NSLog(@"TOC clicked, row: %ld", (long)clickedRow);
@@ -2742,6 +2799,9 @@ extern "C" void showSimpleCommandPalette();
     TOCItem* item = [_tocOutlineView itemAtRow:clickedRow];
     NSLog(@"TOC item: %@, title: %@", item, item.title);
     if (item && item.title) {
+        [self scrollToHeading:item];
+        return;
+        
         // Build the heading pattern to search for (with # prefix)
         NSMutableString* headingPattern = [NSMutableString string];
         
