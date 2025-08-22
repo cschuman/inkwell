@@ -27,10 +27,10 @@
 - (void)onDragEnter:(NSPoint)point {
     [super onDragEnter:point];
     
-    NSLog(@"NoEffect: onDragEnter called at point: %@", NSStringFromPoint(point));
+    // NSLog(@"NoEffect: onDragEnter called at point: %@", NSStringFromPoint(point));
     
     if (!self.overlayView && self.targetView) {
-        NSLog(@"NoEffect: Creating overlay view");
+        // NSLog(@"NoEffect: Creating overlay view");
         self.overlayView = [[NSView alloc] initWithFrame:self.targetView.bounds];
         self.overlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         self.overlayView.wantsLayer = YES;
@@ -42,7 +42,7 @@
 }
 
 - (void)renderToView:(NSView*)view {
-    NSLog(@"NoEffect: renderToView called, isDragging=%d, overlayView=%@", self.isDragging, self.overlayView);
+    // NSLog(@"NoEffect: renderToView called, isDragging=%d, overlayView=%@", self.isDragging, self.overlayView);
     
     // Update targetView
     self.targetView = view;
@@ -54,7 +54,7 @@
         }
         
         if (self.overlayView.superview != view) {
-            NSLog(@"NoEffect: Adding overlay to view");
+            // NSLog(@"NoEffect: Adding overlay to view");
             // Add overlay on top of everything
             [view addSubview:self.overlayView positioned:NSWindowAbove relativeTo:nil];
             // Make sure it's on top by setting layer z-position
@@ -65,7 +65,7 @@
 
 - (void)onDragExit {
     [super onDragExit];
-    NSLog(@"NoEffect: onDragExit - removing overlay");
+    // NSLog(@"NoEffect: onDragExit - removing overlay");
     [self.overlayView removeFromSuperview];
     [self.overlayView release];
     self.overlayView = nil;
@@ -73,7 +73,7 @@
 
 - (void)onDrop:(NSPoint)point {
     [super onDrop:point];
-    NSLog(@"NoEffect: onDrop - removing overlay");
+    // NSLog(@"NoEffect: onDrop - removing overlay");
     [self.overlayView removeFromSuperview];
     [self.overlayView release];
     self.overlayView = nil;

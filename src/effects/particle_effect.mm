@@ -199,7 +199,7 @@
 }
 
 - (void)renderToView:(NSView*)view {
-    NSLog(@"ParticleEffect: renderToView called, emitterLayer=%@", self.emitterLayer);
+    // NSLog(@"ParticleEffect: renderToView called, emitterLayer=%@", self.emitterLayer);
     
     // Always update targetView
     self.targetView = view;

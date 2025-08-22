@@ -263,7 +263,7 @@ extern "C" void showSimpleCommandPalette();
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     
-    NSString* title = [NSString stringWithFormat:@"Markdown Viewer v%s (Build %d)", 
+    NSString* title = [NSString stringWithFormat:@"Inkwell v%s (Build %d)", 
                        mdviewer::getVersionString(), 
                        mdviewer::getBuildNumber()];
     [self.window setTitle:title];
@@ -334,7 +334,7 @@ extern "C" void showSimpleCommandPalette();
     
     [appMenu addItem:[NSMenuItem separatorItem]];
     
-    [appMenu addItemWithTitle:@"Quit Markdown Viewer" 
+    [appMenu addItemWithTitle:@"Quit Inkwell" 
                        action:@selector(terminate:) 
                 keyEquivalent:@"q"];
     
@@ -894,7 +894,6 @@ extern "C" void showSimpleCommandPalette();
     NSMutableArray* _tocItems;
     
     // File browser
-    NSSegmentedControl* _sidebarModeSelector;
     NSOutlineView* _fileOutlineView;
     NSScrollView* _fileScrollView;
     NSMutableArray* _fileItems;
@@ -957,7 +956,7 @@ extern "C" void showSimpleCommandPalette();
         _currentSearchIndex = -1;
         
         // Initialize TOC items
-        _tocItems = [NSMutableArray array];
+        _tocItems = [[NSMutableArray array] retain];
         
         // Initialize navigation history
         _navigationHistory = [[NSMutableArray array] retain];
@@ -1001,6 +1000,13 @@ extern "C" void showSimpleCommandPalette();
         _searchResults = nil;
     }
     [_tocItems release];
+    [_tocScrollView release];
+    [_tocOutlineView release];
+    [_fileOutlineView release];
+    [_fileScrollView release];
+    [_currentFolderPath release];
+    [_currentFilePath release];
+    [_fileItems release];
     [super dealloc];
 }
 
@@ -1081,39 +1087,109 @@ extern "C" void showSimpleCommandPalette();
     _statusLabel.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     [view addSubview:_statusLabel];
     
-    // Create split view to hold TOC and content
+    // Create main split view to hold all columns
     NSRect splitFrame = NSMakeRect(0, 22, frame.size.width, frame.size.height - 22);
     _splitView = [[NSSplitView alloc] initWithFrame:splitFrame];
     [_splitView setDividerStyle:NSSplitViewDividerStyleThin];
     [_splitView setVertical:YES];
     _splitView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     
-    // Create sidebar container
-    NSView* sidebarContainer = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height)];
+    // Create file browser container (Column 1)
+    NSView* fileBrowserContainer = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height)];
     
-    // Create segmented control for switching between TOC and Files
-    _sidebarModeSelector = [[NSSegmentedControl alloc] initWithFrame:NSMakeRect(10, splitFrame.size.height - 35, 230, 25)];
-    [_sidebarModeSelector setSegmentCount:2];
-    [_sidebarModeSelector setLabel:@"Outline" forSegment:0];
-    [_sidebarModeSelector setLabel:@"Files" forSegment:1];
-    [_sidebarModeSelector setSelectedSegment:0];
-    [_sidebarModeSelector setTarget:self];
-    [_sidebarModeSelector setAction:@selector(sidebarModeChanged:)];
-    _sidebarModeSelector.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
+    // Add title label with icon for file browser
+    NSTextField* fileBrowserTitle = [[NSTextField alloc] initWithFrame:NSMakeRect(10, splitFrame.size.height - 25, 180, 20)];
+    
+    // Create attributed string with folder icon
+    NSMutableAttributedString* filesTitle = [[NSMutableAttributedString alloc] init];
+    if (@available(macOS 11.0, *)) {
+        NSImage* folderIcon = [NSImage imageWithSystemSymbolName:@"folder" accessibilityDescription:@"Files"];
+        if (folderIcon) {
+            [folderIcon setSize:NSMakeSize(14, 14)];
+            NSTextAttachment* attachment = [[NSTextAttachment alloc] init];
+            attachment.image = folderIcon;
+            [filesTitle appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+            [filesTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
+        }
+    }
+    [filesTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@"Files"]];
+    
+    [fileBrowserTitle setAttributedStringValue:filesTitle];
+    [fileBrowserTitle setEditable:NO];
+    [fileBrowserTitle setBordered:NO];
+    [fileBrowserTitle setBackgroundColor:[NSColor clearColor]];
+    [fileBrowserTitle setFont:[NSFont boldSystemFontOfSize:11]];
+    [fileBrowserTitle setTextColor:[NSColor secondaryLabelColor]];
+    fileBrowserTitle.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
+    [fileBrowserContainer addSubview:fileBrowserTitle];
+    
+    // Create file browser outline view
+    _fileScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height - 30)] retain];
+    [_fileScrollView setHasVerticalScroller:YES];
+    [_fileScrollView setAutohidesScrollers:YES];
+    _fileScrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    
+    _fileOutlineView = [[[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height - 35)] retain];
+    [_fileOutlineView setHeaderView:nil];
+    [_fileOutlineView setIndentationPerLevel:16];
+    [_fileOutlineView setFloatsGroupRows:NO];
+    
+    NSTableColumn* fileColumn = [[NSTableColumn alloc] initWithIdentifier:@"name"];
+    [fileColumn setWidth:180];
+    [_fileOutlineView addTableColumn:fileColumn];
+    [_fileOutlineView setOutlineTableColumn:fileColumn];
+    
+    [_fileOutlineView setDataSource:self];
+    [_fileOutlineView setDelegate:self];
+    [_fileOutlineView setTarget:self];
+    [_fileOutlineView setAction:@selector(fileItemClicked:)];
+    [_fileOutlineView setDoubleAction:@selector(fileItemClicked:)];
+    
+    [_fileScrollView setDocumentView:_fileOutlineView];
+    [fileBrowserContainer addSubview:_fileScrollView];
+    
+    // Create TOC container (Column 2)
+    NSView* tocContainer = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height)];
+    
+    // Add title label with icon for TOC
+    NSTextField* tocTitle = [[NSTextField alloc] initWithFrame:NSMakeRect(10, splitFrame.size.height - 25, 180, 20)];
+    
+    // Create attributed string with list icon
+    NSMutableAttributedString* outlineTitle = [[NSMutableAttributedString alloc] init];
+    if (@available(macOS 11.0, *)) {
+        NSImage* outlineIcon = [NSImage imageWithSystemSymbolName:@"list.bullet.indent" accessibilityDescription:@"Outline"];
+        if (outlineIcon) {
+            [outlineIcon setSize:NSMakeSize(14, 14)];
+            NSTextAttachment* attachment = [[NSTextAttachment alloc] init];
+            attachment.image = outlineIcon;
+            [outlineTitle appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
+            [outlineTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
+        }
+    }
+    [outlineTitle appendAttributedString:[[NSAttributedString alloc] initWithString:@"Outline"]];
+    
+    [tocTitle setAttributedStringValue:outlineTitle];
+    [tocTitle setEditable:NO];
+    [tocTitle setBordered:NO];
+    [tocTitle setBackgroundColor:[NSColor clearColor]];
+    [tocTitle setFont:[NSFont boldSystemFontOfSize:11]];
+    [tocTitle setTextColor:[NSColor secondaryLabelColor]];
+    tocTitle.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
+    [tocContainer addSubview:tocTitle];
     
     // Create TOC outline view
-    _tocScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
+    _tocScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height - 30)] retain];
     [_tocScrollView setHasVerticalScroller:YES];
     [_tocScrollView setAutohidesScrollers:YES];
     _tocScrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     
-    _tocOutlineView = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
+    _tocOutlineView = [[[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height - 35)] retain];
     [_tocOutlineView setHeaderView:nil];
     [_tocOutlineView setIndentationPerLevel:16];
     [_tocOutlineView setFloatsGroupRows:NO];
     
     NSTableColumn* tocColumn = [[NSTableColumn alloc] initWithIdentifier:@"title"];
-    [tocColumn setWidth:230];
+    [tocColumn setWidth:180];
     [_tocOutlineView addTableColumn:tocColumn];
     [_tocOutlineView setOutlineTableColumn:tocColumn];
     
@@ -1124,39 +1200,7 @@ extern "C" void showSimpleCommandPalette();
     [_tocOutlineView setDoubleAction:@selector(tocItemClicked:)];
     
     [_tocScrollView setDocumentView:_tocOutlineView];
-    
-    // Create file browser outline view
-    NSScrollView* fileScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
-    [fileScrollView setHasVerticalScroller:YES];
-    [fileScrollView setAutohidesScrollers:YES];
-    fileScrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    
-    _fileOutlineView = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 250, splitFrame.size.height - 40)];
-    [_fileOutlineView setHeaderView:nil];
-    [_fileOutlineView setIndentationPerLevel:16];
-    [_fileOutlineView setFloatsGroupRows:NO];
-    
-    NSTableColumn* fileColumn = [[NSTableColumn alloc] initWithIdentifier:@"name"];
-    [fileColumn setWidth:230];
-    [_fileOutlineView addTableColumn:fileColumn];
-    [_fileOutlineView setOutlineTableColumn:fileColumn];
-    
-    [_fileOutlineView setDataSource:self];
-    [_fileOutlineView setDelegate:self];
-    [_fileOutlineView setTarget:self];
-    [_fileOutlineView setAction:@selector(fileItemClicked:)];
-    [_fileOutlineView setDoubleAction:@selector(fileItemClicked:)];
-    
-    [fileScrollView setDocumentView:_fileOutlineView];
-    
-    // Add views to sidebar container
-    [sidebarContainer addSubview:_sidebarModeSelector];
-    [sidebarContainer addSubview:_tocScrollView];
-    [sidebarContainer addSubview:fileScrollView];
-    
-    // Initially hide file browser
-    [fileScrollView setHidden:YES];
-    _showingFileBrowser = NO;
+    [tocContainer addSubview:_tocScrollView];
     
     // Create main content scroll view  
     NSRect scrollFrame = NSMakeRect(0, 0, frame.size.width, splitFrame.size.height);
@@ -1173,15 +1217,14 @@ extern "C" void showSimpleCommandPalette();
     contentBackground.state = NSVisualEffectStateActive;
     [_scrollView addSubview:contentBackground positioned:NSWindowBelow relativeTo:nil];
     
-    // Add views to split view
-    [_splitView addSubview:sidebarContainer];
+    // Add views to split view (3 columns: File Browser | TOC | Content)
+    [_splitView addSubview:fileBrowserContainer];
+    [_splitView addSubview:tocContainer];
     [_splitView addSubview:_scrollView];
     
-    // Set initial split position (hide sidebar initially)
-    [_splitView setPosition:0 ofDividerAtIndex:0];
-    
-    // Store reference to file scroll view
-    _fileScrollView = fileScrollView;
+    // Set initial split positions (hide both sidebars initially)
+    [_splitView setPosition:0 ofDividerAtIndex:0];  // Hide file browser
+    [_splitView setPosition:0 ofDividerAtIndex:1];  // Hide TOC
     
     [view addSubview:_splitView];
     
@@ -1474,7 +1517,8 @@ extern "C" void showSimpleCommandPalette();
 - (void)openFile:(NSString*)path {
     
     // Store file info
-    _currentFilePath = path;
+    [_currentFilePath release];
+    _currentFilePath = [path retain];
     
     // Add to navigation history if not navigating through history
     if (!_isNavigatingHistory) {
@@ -2396,18 +2440,20 @@ extern "C" void showSimpleCommandPalette();
 
 - (void)buildTOCFromDocument {
     if (!_currentDocument || !_currentDocument->get_root()) {
-        _tocItems = [NSMutableArray array];
+        [_tocItems release];
+        _tocItems = [[NSMutableArray array] retain];
         [_tocOutlineView reloadData];
         return;
     }
     
-    _tocItems = [NSMutableArray array];
+    [_tocItems release];
+    _tocItems = [[NSMutableArray array] retain];
     
     // Traverse the document and find all headings
     std::function<void(const mdviewer::Document::Node*, NSMutableArray*)> findHeadings = 
         [&findHeadings](const mdviewer::Document::Node* node, NSMutableArray* items) {
             if (node->type == mdviewer::Document::NodeType::Heading) {
-                TOCItem* item = [[TOCItem alloc] init];
+                TOCItem* item = [[[TOCItem alloc] init] autorelease];
                 item.level = node->heading_level;
                 
                 // Build title from text children
@@ -2439,83 +2485,79 @@ extern "C" void showSimpleCommandPalette();
 }
 
 - (void)toggleTOCSidebar {
-    // Get the sidebar container (first subview of split view)
-    NSView* sidebarContainer = [[_splitView subviews] firstObject];
-    BOOL sidebarCollapsed = [_splitView isSubviewCollapsed:sidebarContainer];
+    // TOC is the second subview (index 1)
+    NSArray* subviews = [_splitView subviews];
+    if ([subviews count] < 3) return;
     
-    if (sidebarCollapsed) {  // Sidebar is hidden
-        // Show sidebar with TOC
-        [_splitView setPosition:250 ofDividerAtIndex:0];
-        [_sidebarModeSelector setSelectedSegment:0];
-        [self sidebarModeChanged:nil];
+    NSView* fileBrowserContainer = [subviews objectAtIndex:0];
+    NSView* tocContainer = [subviews objectAtIndex:1];
+    CGFloat fileBrowserWidth = NSWidth([fileBrowserContainer frame]);
+    CGFloat tocWidth = NSWidth([tocContainer frame]);
+    
+    if (tocWidth < 10) {
+        // TOC is hidden - show it
+        // If file browser is visible, position after it, otherwise at position 0
+        CGFloat newPosition = (fileBrowserWidth > 10) ? fileBrowserWidth + 200 : 200;
+        [_splitView setPosition:newPosition ofDividerAtIndex:1];
         
         // Build/refresh TOC
         [self buildTOCFromDocument];
-        NSLog(@"Showing TOC sidebar");
+        NSLog(@"Showing TOC sidebar (position: %f)", newPosition);
     } else {
-        // Hide sidebar
-        [_splitView setPosition:0 ofDividerAtIndex:0];
+        // TOC is visible - hide it
+        [_splitView setPosition:fileBrowserWidth ofDividerAtIndex:1];
         NSLog(@"Hiding TOC sidebar");
     }
 }
 
 - (void)toggleFileBrowser {
-    // Get current position of divider
-    CGFloat currentPosition = NSWidth([[[_splitView subviews] firstObject] frame]);
-    NSLog(@"Current sidebar width: %f", currentPosition);
+    // File browser is the first subview (index 0)
+    NSArray* subviews = [_splitView subviews];
+    if ([subviews count] < 3) return;
     
-    if (currentPosition < 10) {
-        // Sidebar is hidden - show it with files
-        [_splitView setPosition:250 ofDividerAtIndex:0];
-        [_sidebarModeSelector setSelectedSegment:1];
-        [self sidebarModeChanged:nil];
-        NSLog(@"Showing file browser sidebar (was hidden)");
-    } else if (_showingFileBrowser) {
-        // Hide sidebar if already showing files
-        [_splitView setPosition:0 ofDividerAtIndex:0];
-        NSLog(@"Hiding file browser sidebar");
-    } else {
-        // Sidebar visible but showing TOC - switch to files
-        [_sidebarModeSelector setSelectedSegment:1];
-        [self sidebarModeChanged:nil];
-        NSLog(@"Switching from TOC to file browser");
-    }
-}
-
-- (void)sidebarModeChanged:(id)sender {
-    NSInteger selectedSegment = [_sidebarModeSelector selectedSegment];
-    NSLog(@"Sidebar mode changed to: %@", selectedSegment == 0 ? @"TOC" : @"Files");
+    NSView* fileBrowserContainer = [subviews objectAtIndex:0];
+    NSView* tocContainer = [subviews objectAtIndex:1];
+    CGFloat fileBrowserWidth = NSWidth([fileBrowserContainer frame]);
+    CGFloat tocWidth = NSWidth([tocContainer frame]);
     
-    if (selectedSegment == 0) {  // TOC
-        [_tocScrollView setHidden:NO];
-        [_fileScrollView setHidden:YES];
-        _showingFileBrowser = NO;
-        [self buildTOCFromDocument];
-    } else {  // Files
-        [_tocScrollView setHidden:YES];
-        [_fileScrollView setHidden:NO];
-        _showingFileBrowser = YES;
-        NSLog(@"File browser activated, current folder: %@", _currentFolderPath);
+    if (fileBrowserWidth < 10) {
+        // File browser is hidden - show it
+        [_splitView setPosition:200 ofDividerAtIndex:0];
+        
+        // If TOC is visible, we need to adjust its position too
+        if (tocWidth > 10) {
+            [_splitView setPosition:400 ofDividerAtIndex:1];  // 200 for file browser + 200 for TOC
+        }
+        
+        NSLog(@"Showing file browser sidebar");
         
         // If no folder is open, open the current file's directory
         if (!_currentFolderPath) {
             if (_currentFilePath) {
                 NSString* folderPath = [_currentFilePath stringByDeletingLastPathComponent];
+                [self openFolder:folderPath];
                 NSLog(@"Opening folder from current file path: %@", folderPath);
-                [self openFolder:folderPath];
-            } else if (_currentDocument) {
-                NSString* filePath = _currentFilePath;
-                NSString* folderPath = [filePath stringByDeletingLastPathComponent];
-                NSLog(@"Opening folder from document: %@", folderPath);
-                [self openFolder:folderPath];
             }
         }
+    } else {
+        // File browser is visible - hide it
+        [_splitView setPosition:0 ofDividerAtIndex:0];
+        
+        // If TOC is visible, adjust its position
+        if (tocWidth > 10) {
+            [_splitView setPosition:200 ofDividerAtIndex:1];  // Move TOC to the left
+        }
+        
+        NSLog(@"Hiding file browser sidebar");
     }
 }
 
+// Removed sidebarModeChanged - no longer needed with independent sidebars
+
 - (void)openFolder:(NSString*)folderPath {
     NSLog(@"openFolder called with path: %@", folderPath);
-    _currentFolderPath = folderPath;
+    [_currentFolderPath release];
+    _currentFolderPath = [folderPath retain];
     [self buildFileTreeFromFolder:folderPath];
 }
 
@@ -2692,9 +2734,11 @@ extern "C" void showSimpleCommandPalette();
 
 - (void)tocItemClicked:(id)sender {
     NSInteger clickedRow = [_tocOutlineView clickedRow];
+    NSLog(@"TOC clicked, row: %ld", (long)clickedRow);
     if (clickedRow < 0) return;  // No row clicked
     
     TOCItem* item = [_tocOutlineView itemAtRow:clickedRow];
+    NSLog(@"TOC item: %@, title: %@", item, item.title);
     if (item && item.title) {
         // Build the heading pattern to search for (with # prefix)
         NSMutableString* headingPattern = [NSMutableString string];
@@ -2884,10 +2928,9 @@ extern "C" void showSimpleCommandPalette();
         } else if ([item isKindOfClass:[FileItem class]]) {
             // Handle file item click
             FileItem* fileItem = (FileItem*)item;
-            if (!fileItem.isDirectory) {
+            if (!fileItem.isDirectory && fileItem.path) {
                 // Open the markdown file
-                AppDelegate* appDelegate = (AppDelegate*)[NSApp delegate];
-                [appDelegate openFile:fileItem.path];
+                [self openFile:fileItem.path];
             }
         }
     }
