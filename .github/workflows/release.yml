@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.7)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup build environment
+      run: |
+        brew install cmake
+        brew install vcpkg
+        echo "VCPKG_ROOT=$(brew --prefix vcpkg)/libexec" >> $GITHUB_ENV
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "push" ]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Building version ${VERSION}"
+
+    - name: Update version files
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        sed -i '' "s/VERSION [0-9]\+\.[0-9]\+\.[0-9]\+/VERSION ${VERSION}/" CMakeLists.txt
+        sed -i '' "s/VERSION=\"[0-9]\+\.[0-9]\+\.[0-9]\+\"/VERSION=\"${VERSION}\"/" scripts/build_release.sh
+
+    - name: Build release
+      run: |
+        ./scripts/build_release.sh
+
+    - name: Calculate SHA256
+      id: sha256
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        SHA256=$(shasum -a 256 Inkwell-${VERSION}.dmg | cut -d' ' -f1)
+        echo "SHA256=${SHA256}" >> $GITHUB_OUTPUT
+
+    - name: Create cask formula
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        SHA256="${{ steps.sha256.outputs.SHA256 }}"
+        mkdir -p homebrew
+        cat > homebrew/inkwell.rb << EOF
+        cask "inkwell" do
+          version "${VERSION}"
+          sha256 "${SHA256}"
+
+          url "https://github.com/cschuman/inkwell/releases/download/v#{version}/Inkwell-#{version}.dmg"
+          name "Inkwell"
+          desc "Native macOS markdown viewer with beautiful typography"
+          homepage "https://github.com/cschuman/inkwell"
+
+          auto_updates true
+          depends_on macos: ">= :big_sur"
+
+          app "Inkwell.app"
+
+          zap trash: [
+            "~/Library/Preferences/com.coreymd.inkwell.plist",
+            "~/Library/Saved Application State/com.coreymd.inkwell.savedState",
+          ]
+        end
+        EOF
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.version.outputs.VERSION }}
+        name: Inkwell v${{ steps.version.outputs.VERSION }}
+        files: |
+          Inkwell-${{ steps.version.outputs.VERSION }}.dmg
+        body: |
+          ## Download
+          **[Inkwell-${{ steps.version.outputs.VERSION }}.dmg](https://github.com/cschuman/inkwell/releases/download/v${{ steps.version.outputs.VERSION }}/Inkwell-${{ steps.version.outputs.VERSION }}.dmg)**
+          
+          SHA256: `${{ steps.sha256.outputs.SHA256 }}`
+          
+          ## Installation
+          
+          ### Direct Download
+          1. Download the DMG file above
+          2. Open and drag Inkwell to Applications
+          3. Right-click and select "Open" on first launch
+          
+          ### Homebrew
+          ```bash
+          brew tap cschuman/tap
+          brew install --cask inkwell
+          ```
+          
+          ## What's Changed
+          See the [changelog](https://github.com/cschuman/inkwell/blob/main/CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload cask formula as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: homebrew-cask
+        path: homebrew/inkwell.rb
+
+    - name: Update Homebrew Tap
+      if: github.repository == 'cschuman/inkwell'  # Only on main repo
+      run: |
+        # This step would require setting up a PAT (Personal Access Token)
+        # to push to the tap repository
+        echo "Manual step required: Update homebrew-tap repository with new cask formula"
+        echo "Cask formula saved as artifact - download and commit to tap repository"

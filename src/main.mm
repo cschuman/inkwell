@@ -9,10 +9,14 @@
 #include "rendering/markdown_renderer.h"
 #include "platform/file_watcher.h"
 #import "ui/command_palette.h"
+#include "ui/settings_manager.h"
 #include "version.h"
 
 // Simple command palette function
 extern "C" void showSimpleCommandPalette();
+
+// Settings window function
+extern "C" void showSettingsWindow();
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property (strong) NSWindow* window;
@@ -227,6 +231,11 @@ extern "C" void showSimpleCommandPalette();
 - (void)showCommandPalette:(id)sender;
 - (void)performSearch:(NSString*)searchTerm;
 - (void)findNext;
+- (void)setThemeLight:(id)sender;
+- (void)setThemeDark:(id)sender;
+- (void)setThemeSystem:(id)sender;
+- (void)updateDocumentWithCurrentTheme;
+- (void)updateThemeMenuCheckmarks;
 - (void)findPrevious;
 - (void)exportAsPDF:(id)sender;
 - (void)exportAsHTML:(id)sender;
@@ -247,6 +256,22 @@ extern "C" void showSimpleCommandPalette();
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification*)notification {
+    // Load settings
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    settings.loadSettings();
+    
+    // Set up theme change callback
+    // Note: Using direct self reference since we're using manual reference counting
+    settings.setThemeChangeCallback([self](bool isDarkMode) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // Re-render the current document with new theme
+            MarkdownViewController* vc = (MarkdownViewController*)self.mainViewController;
+            if (vc) {
+                [vc updateDocumentWithCurrentTheme];
+            }
+        });
+    });
+    
     // Create menu bar
     [self createMenuBar];
     
@@ -324,12 +349,17 @@ extern "C" void showSimpleCommandPalette();
     NSLog(@"Build Number: %d", mdviewer::getBuildNumber());
     NSLog(@"Build Date: %s", mdviewer::getBuildDate());
     
-    // Modern macOS window appearance
+    // Bauhaus-inspired window appearance
     self.window.titlebarAppearsTransparent = YES;
-    // Hide the title for ultra-minimal look
     self.window.titleVisibility = NSWindowTitleHidden;
-    self.window.backgroundColor = [NSColor windowBackgroundColor];
-    self.window.minSize = NSMakeSize(600, 400);
+    
+    // Set background based on theme
+    if (settings.shouldUseDarkMode()) {
+        self.window.backgroundColor = [NSColor colorWithWhite:0.1 alpha:1.0];
+    } else {
+        self.window.backgroundColor = [NSColor colorWithWhite:1.0 alpha:1.0];
+    }
+    self.window.minSize = NSMakeSize(800, 600);  // Larger minimum for better typography
     
     // Add toolbar with unified style
     NSToolbar* toolbar = [[NSToolbar alloc] initWithIdentifier:@"MainToolbar"];
@@ -554,6 +584,46 @@ extern "C" void showSimpleCommandPalette();
                                           keyEquivalent:@"."];
     [focusItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
     [focusItem setTarget:nil];
+    
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    
+    // Theme submenu
+    NSMenuItem* themeMenuItem = [[NSMenuItem alloc] init];
+    [themeMenuItem setTitle:@"Theme"];
+    [viewMenu addItem:themeMenuItem];
+    
+    NSMenu* themeMenu = [[NSMenu alloc] initWithTitle:@"Theme"];
+    [themeMenuItem setSubmenu:themeMenu];
+    
+    NSMenuItem* lightThemeItem = [themeMenu addItemWithTitle:@"Light" 
+                                                       action:@selector(setThemeLight:) 
+                                                keyEquivalent:@"1"];
+    [lightThemeItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagControl)];
+    [lightThemeItem setTarget:nil];
+    [lightThemeItem setTag:0];  // ThemeMode::Light
+    
+    NSMenuItem* darkThemeItem = [themeMenu addItemWithTitle:@"Dark" 
+                                                      action:@selector(setThemeDark:) 
+                                               keyEquivalent:@"2"];
+    [darkThemeItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagControl)];
+    [darkThemeItem setTarget:nil];
+    [darkThemeItem setTag:1];  // ThemeMode::Dark
+    
+    NSMenuItem* systemThemeItem = [themeMenu addItemWithTitle:@"System" 
+                                                        action:@selector(setThemeSystem:) 
+                                                 keyEquivalent:@"3"];
+    [systemThemeItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagControl)];
+    [systemThemeItem setTarget:nil];
+    [systemThemeItem setTag:2];  // ThemeMode::System
+    
+    // Set initial checkmark based on current theme
+    auto& themeSettings = mdviewer::ui::SettingsManager::getInstance();
+    NSInteger currentTheme = static_cast<NSInteger>(themeSettings.getThemeMode());
+    for (NSMenuItem* item in [themeMenu itemArray]) {
+        if ([item tag] >= 0 && [item tag] <= 2) {
+            [item setState:([item tag] == currentTheme) ? NSControlStateValueOn : NSControlStateValueOff];
+        }
+    }
     
     [viewMenu addItem:[NSMenuItem separatorItem]];
     
@@ -1250,13 +1320,25 @@ extern "C" void showSimpleCommandPalette();
     [_tocScrollView setDocumentView:_tocOutlineView];
     [tocContainer addSubview:_tocScrollView];
     
-    // Create main content scroll view  
+    // Create main content scroll view with refined appearance
     NSRect scrollFrame = NSMakeRect(0, 0, frame.size.width, splitFrame.size.height);
     _scrollView = [[NSScrollView alloc] initWithFrame:scrollFrame];
     [_scrollView setHasVerticalScroller:YES];
-    [_scrollView setHasHorizontalScroller:YES];
+    [_scrollView setHasHorizontalScroller:NO];  // No horizontal scroll for cleaner look
     [_scrollView setAutohidesScrollers:YES];
     _scrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    
+    // Refined scroll view appearance
+    [_scrollView setBorderType:NSNoBorder];
+    [_scrollView setScrollerStyle:NSScrollerStyleOverlay];  // Modern overlay scrollers
+    
+    // Set scroll view background based on theme
+    auto& settingsManager = mdviewer::ui::SettingsManager::getInstance();
+    if (settingsManager.shouldUseDarkMode()) {
+        [_scrollView setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+    } else {
+        [_scrollView setBackgroundColor:[NSColor colorWithWhite:0.98 alpha:1.0]];
+    }
     
     // Add glass effect background
     NSVisualEffectView* contentBackground = [[NSVisualEffectView alloc] initWithFrame:scrollFrame];
@@ -1282,24 +1364,48 @@ extern "C" void showSimpleCommandPalette();
     [_textView setEditable:NO];
     [_textView setSelectable:YES];
     
-    // Initialize font size tracking
-    _baseFontSize = 14.0;
+    // Initialize font size tracking with golden ratio base
+    _baseFontSize = 16.0;  // Base size for golden ratio scale
     _currentFontSize = _baseFontSize;
-    [_textView setFont:[NSFont systemFontOfSize:_currentFontSize]];
     
-    [_textView setBackgroundColor:[NSColor textBackgroundColor]];
-    [_textView setTextColor:[NSColor textColor]];
-    [_textView setString:@"Ready - Use File → Open to load a markdown file"];
+    // Premium typography - use serif font for elegant reading
+    NSFont* bodyFont = nil;
+    if (@available(macOS 10.15, *)) {
+        bodyFont = [NSFont fontWithName:@"New York" size:_currentFontSize] ?:
+                   [NSFont fontWithName:@"Georgia" size:_currentFontSize];
+    } else {
+        bodyFont = [NSFont fontWithName:@"Georgia" size:_currentFontSize];
+    }
+    if (!bodyFont) bodyFont = [NSFont systemFontOfSize:_currentFontSize];
+    [_textView setFont:bodyFont];
+    
+    // Refined color palette based on theme
+    if (settingsManager.shouldUseDarkMode()) {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+        [_textView setTextColor:[NSColor colorWithWhite:0.92 alpha:0.95]];
+    } else {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:0.98 alpha:1.0]];
+        [_textView setTextColor:[NSColor colorWithWhite:0.04 alpha:0.95]];
+    }
+    [_textView setString:@""];  // Start with empty content for cleaner look
     [_textView setDelegate:self];
     
     // Enable automatic link detection
     [_textView setAutomaticLinkDetectionEnabled:YES];
     [_textView setDisplaysLinkToolTips:YES];
     
-    // Set text container properties for better rendering
-    [[_textView textContainer] setContainerSize:NSMakeSize(scrollFrame.size.width - 40, FLT_MAX)];
-    [[_textView textContainer] setWidthTracksTextView:YES];
-    [_textView setTextContainerInset:NSMakeSize(20, 20)];
+    // Golden ratio-based text container with generous padding
+    CGFloat goldenPadding = 89;  // From our golden ratio spacing scale
+    CGFloat maxTextWidth = 700;  // Optimal reading width
+    
+    // Calculate actual container width
+    CGFloat containerWidth = MIN(scrollFrame.size.width - (goldenPadding * 2), maxTextWidth);
+    
+    [[_textView textContainer] setContainerSize:NSMakeSize(containerWidth, FLT_MAX)];
+    [[_textView textContainer] setWidthTracksTextView:NO];  // Fixed width for optimal reading
+    
+    // Luxurious padding using golden ratio
+    [_textView setTextContainerInset:NSMakeSize(goldenPadding, 55)];  // 89 horizontal, 55 vertical (golden ratio)
     
     [_scrollView setDocumentView:_textView];
     
@@ -1675,12 +1781,9 @@ extern "C" void showSimpleCommandPalette();
     }
     
     // Check if dark mode is enabled
-    BOOL isDarkMode = NO;
-    if (@available(macOS 10.14, *)) {
-        NSAppearance* appearance = [NSApp effectiveAppearance];
-        isDarkMode = appearance && ([appearance.name isEqualToString:NSAppearanceNameDarkAqua] ||
-                                   [appearance.name isEqualToString:NSAppearanceNameVibrantDark]);
-    }
+    // Use settings manager to determine theme
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    BOOL isDarkMode = settings.shouldUseDarkMode();
     
     // Render the markdown document
     NSDate* renderStart = [NSDate date];
@@ -1727,6 +1830,16 @@ extern "C" void showSimpleCommandPalette();
 
 - (void)viewDidAppear {
     [super viewDidAppear];
+    
+    // Ensure text view has correct colors for current theme
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    if (settings.shouldUseDarkMode()) {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+        [_textView setTextColor:[NSColor colorWithWhite:0.92 alpha:0.95]];
+    } else {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:0.98 alpha:1.0]];
+        [_textView setTextColor:[NSColor colorWithWhite:0.04 alpha:0.95]];
+    }
     
     // Start FPS tracking
     [self startFPSTracking];
@@ -1802,12 +1915,9 @@ extern "C" void showSimpleCommandPalette();
 }
 
 - (void)updateAppearance {
-    BOOL isDarkMode = NO;
-    if (@available(macOS 10.14, *)) {
-        NSAppearance* appearance = [NSApp effectiveAppearance];
-        isDarkMode = appearance && ([appearance.name isEqualToString:NSAppearanceNameDarkAqua] ||
-                                   [appearance.name isEqualToString:NSAppearanceNameVibrantDark]);
-    }
+    // Use settings manager to determine theme
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    BOOL isDarkMode = settings.shouldUseDarkMode();
     
     // Update background colors
     if (isDarkMode) {
@@ -2467,12 +2577,9 @@ extern "C" void showSimpleCommandPalette();
     WKWebView* webView = [[WKWebView alloc] initWithFrame:frame configuration:config];
     
     // Check if dark mode is enabled
-    BOOL isDarkMode = NO;
-    if (@available(macOS 10.14, *)) {
-        NSAppearance* appearance = [NSApp effectiveAppearance];
-        isDarkMode = appearance && ([appearance.name isEqualToString:NSAppearanceNameDarkAqua] ||
-                                   [appearance.name isEqualToString:NSAppearanceNameVibrantDark]);
-    }
+    // Use settings manager to determine theme
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    BOOL isDarkMode = settings.shouldUseDarkMode();
     
     NSString* theme = isDarkMode ? @"dark" : @"default";
     NSString* bgColor = isDarkMode ? @"#1e1e1e" : @"white";
@@ -2629,6 +2736,87 @@ extern "C" void showSimpleCommandPalette();
         }
         
         NSLog(@"Hiding file browser sidebar");
+    }
+}
+
+- (void)setThemeLight:(id)sender {
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    settings.setThemeMode(mdviewer::ui::ThemeMode::Light);
+    [self updateThemeMenuCheckmarks];
+}
+
+- (void)setThemeDark:(id)sender {
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    settings.setThemeMode(mdviewer::ui::ThemeMode::Dark);
+    [self updateThemeMenuCheckmarks];
+}
+
+- (void)setThemeSystem:(id)sender {
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    settings.setThemeMode(mdviewer::ui::ThemeMode::System);
+    [self updateThemeMenuCheckmarks];
+}
+
+- (void)updateThemeMenuCheckmarks {
+    // Find the View menu and Theme submenu
+    NSMenu* mainMenu = [NSApp mainMenu];
+    NSMenuItem* viewMenuItem = nil;
+    for (NSMenuItem* item in [mainMenu itemArray]) {
+        if ([[item title] isEqualToString:@"View"]) {
+            viewMenuItem = item;
+            break;
+        }
+    }
+    
+    if (viewMenuItem && [viewMenuItem hasSubmenu]) {
+        NSMenu* viewMenu = [viewMenuItem submenu];
+        NSMenuItem* themeMenuItem = nil;
+        for (NSMenuItem* item in [viewMenu itemArray]) {
+            if ([[item title] isEqualToString:@"Theme"]) {
+                themeMenuItem = item;
+                break;
+            }
+        }
+        
+        if (themeMenuItem && [themeMenuItem hasSubmenu]) {
+            NSMenu* themeMenu = [themeMenuItem submenu];
+            auto& settings = mdviewer::ui::SettingsManager::getInstance();
+            NSInteger currentTheme = static_cast<NSInteger>(settings.getThemeMode());
+            
+            for (NSMenuItem* item in [themeMenu itemArray]) {
+                if ([item tag] >= 0 && [item tag] <= 2) {
+                    [item setState:([item tag] == currentTheme) ? NSControlStateValueOn : NSControlStateValueOff];
+                }
+            }
+        }
+    }
+}
+
+- (void)updateDocumentWithCurrentTheme {
+    // Update window and view backgrounds based on theme
+    auto& settings = mdviewer::ui::SettingsManager::getInstance();
+    BOOL isDarkMode = settings.shouldUseDarkMode();
+    
+    // Update window background
+    AppDelegate* appDelegate = (AppDelegate*)[NSApp delegate];
+    if (isDarkMode) {
+        [appDelegate.window setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+    } else {
+        [appDelegate.window setBackgroundColor:[NSColor colorWithWhite:1.0 alpha:1.0]];
+    }
+    
+    // Update text view and scroll view backgrounds
+    if (isDarkMode) {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+        [_scrollView setBackgroundColor:[NSColor colorWithWhite:0.1 alpha:1.0]];
+    } else {
+        [_textView setBackgroundColor:[NSColor colorWithWhite:1.0 alpha:1.0]];
+        [_scrollView setBackgroundColor:[NSColor colorWithWhite:0.98 alpha:1.0]];
+    }
+    
+    // Re-render the current document with new theme
+    if (_currentFilePath) {
+        [self openFile:_currentFilePath];
     }
 }
 

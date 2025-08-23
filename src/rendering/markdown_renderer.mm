@@ -96,83 +96,135 @@
 @implementation MarkdownRenderer
 
 + (NSDictionary*)baseAttributesForDarkMode:(BOOL)isDarkMode {
-    NSColor* textColor = isDarkMode ? [NSColor colorWithWhite:0.9 alpha:1.0] : [NSColor textColor];
-    NSFont* baseFont = [NSFont systemFontOfSize:14];
+    // Premium typography with elegant serif font for body text
+    NSColor* textColor = isDarkMode ? 
+        [NSColor colorWithWhite:0.92 alpha:0.95] : 
+        [NSColor colorWithWhite:0.04 alpha:0.95];
+    
+    // Use New York or Georgia for body text - elegant serif
+    NSFont* baseFont = nil;
+    if (@available(macOS 10.15, *)) {
+        baseFont = [NSFont fontWithName:@"New York" size:17] ?: 
+                   [NSFont fontWithName:@"Georgia" size:17];
+    } else {
+        baseFont = [NSFont fontWithName:@"Georgia" size:17];
+    }
+    if (!baseFont) baseFont = [NSFont systemFontOfSize:17];
     
     NSMutableParagraphStyle* paragraphStyle = [[NSMutableParagraphStyle alloc] init];
-    [paragraphStyle setLineSpacing:4];
-    [paragraphStyle setParagraphSpacing:12];
+    [paragraphStyle setLineHeightMultiple:1.618];  // Golden ratio line height
+    [paragraphStyle setParagraphSpacing:21];       // Golden ratio spacing
+    [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
+    [paragraphStyle setAlignment:NSTextAlignmentLeft];
+    [paragraphStyle setFirstLineHeadIndent:0];
+    [paragraphStyle setHeadIndent:0];
+    [paragraphStyle setTailIndent:0];
     
     return @{
         NSFontAttributeName: baseFont,
         NSForegroundColorAttributeName: textColor,
-        NSParagraphStyleAttributeName: paragraphStyle
+        NSParagraphStyleAttributeName: paragraphStyle,
+        NSKernAttributeName: @(0.3)  // Slight letter spacing for elegance
     };
 }
 
 + (NSDictionary*)headingAttributesForLevel:(int)level isDarkMode:(BOOL)isDarkMode {
-    CGFloat sizes[] = {28, 24, 20, 18, 16, 14}; // H1-H6 sizes
+    // Golden ratio scale for headings
+    CGFloat sizes[] = {68, 42, 26, 20, 17, 14}; // H1-H6 using golden ratio
     CGFloat size = sizes[MIN(level - 1, 5)];
     
-    NSFont* font = [NSFont boldSystemFontOfSize:size];
+    // Use SF Display or Helvetica Neue for headings - clean sans-serif
+    NSFont* font = nil;
+    NSFontWeight weight = (level <= 2) ? NSFontWeightThin : NSFontWeightLight;
+    
+    if (@available(macOS 10.15, *)) {
+        font = [NSFont systemFontOfSize:size weight:weight];
+    } else {
+        NSString* fontName = (level <= 2) ? @"HelveticaNeue-UltraLight" : @"HelveticaNeue-Light";
+        font = [NSFont fontWithName:fontName size:size] ?: [NSFont boldSystemFontOfSize:size];
+    }
+    
+    // Monochromatic - pure black or white
     NSColor* color = isDarkMode ? 
-        [NSColor colorWithRed:0.4 green:0.6 blue:1.0 alpha:1.0] : 
-        [NSColor systemBlueColor];
+        [NSColor colorWithWhite:1.0 alpha:0.95] : 
+        [NSColor colorWithWhite:0.0 alpha:0.9];
     
     NSMutableParagraphStyle* paragraphStyle = [[NSMutableParagraphStyle alloc] init];
-    [paragraphStyle setParagraphSpacingBefore:16];
-    [paragraphStyle setParagraphSpacing:8];
+    [paragraphStyle setParagraphSpacingBefore:size * 0.8];  // Proportional spacing
+    [paragraphStyle setParagraphSpacing:size * 0.4];
+    [paragraphStyle setLineHeightMultiple:1.1];  // Tight line height for headings
+    
+    // Letter spacing for elegance - tighter for larger text
+    CGFloat letterSpacing = (level <= 2) ? -1.5 : -0.5;
     
     return @{
         NSFontAttributeName: font,
         NSForegroundColorAttributeName: color,
-        NSParagraphStyleAttributeName: paragraphStyle
+        NSParagraphStyleAttributeName: paragraphStyle,
+        NSKernAttributeName: @(letterSpacing)
     };
 }
 
 + (NSDictionary*)codeAttributesForDarkMode:(BOOL)isDarkMode {
-    NSFont* font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
-    NSColor* bgColor = isDarkMode ? 
-        [NSColor colorWithRed:0.15 green:0.17 blue:0.2 alpha:1.0] : 
-        [NSColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
-    NSColor* textColor = isDarkMode ?
-        [NSColor colorWithRed:0.95 green:0.5 blue:0.3 alpha:1.0] :
-        [NSColor colorWithRed:0.8 green:0.2 blue:0.1 alpha:1.0];
+    // Premium monospace font - JetBrains Mono or SF Mono
+    NSFont* font = [NSFont fontWithName:@"JetBrainsMono-Regular" size:14] ?:
+                   [NSFont fontWithName:@"SF Mono" size:14] ?:
+                   [NSFont monospacedSystemFontOfSize:14 weight:NSFontWeightLight];
     
-    // Add padding effect with a slightly rounded background
+    // Subtle background - almost imperceptible
+    NSColor* bgColor = isDarkMode ? 
+        [NSColor colorWithWhite:0.08 alpha:0.3] : 
+        [NSColor colorWithWhite:0.0 alpha:0.02];
+    
+    // Monochromatic text
+    NSColor* textColor = isDarkMode ?
+        [NSColor colorWithWhite:0.8 alpha:0.9] :
+        [NSColor colorWithWhite:0.15 alpha:0.9];
+    
     NSMutableParagraphStyle* style = [[NSMutableParagraphStyle alloc] init];
-    [style setParagraphSpacing:0];
+    [style setParagraphSpacing:8];
+    [style setLineHeightMultiple:1.4];
     
     return @{
         NSFontAttributeName: font,
         NSForegroundColorAttributeName: textColor,
         NSBackgroundColorAttributeName: bgColor,
         NSParagraphStyleAttributeName: style,
-        NSKernAttributeName: @(0.5) // Slight letter spacing for readability
+        NSKernAttributeName: @(0.5)  // Slightly wider spacing for readability
     };
 }
 
 + (NSDictionary*)codeBlockAttributesForDarkMode:(BOOL)isDarkMode {
-    NSFont* font = [NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];
+    // Clean monospace font
+    NSFont* font = [NSFont fontWithName:@"SF Mono" size:13] ?:
+                   [NSFont fontWithName:@"JetBrainsMono-Regular" size:13] ?:
+                   [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
+    
+    // GitHub-style background - subtle but visible
     NSColor* bgColor = isDarkMode ? 
         [NSColor colorWithWhite:0.1 alpha:1.0] : 
-        [NSColor colorWithWhite:0.97 alpha:1.0];
-    NSColor* textColor = isDarkMode ?
-        [NSColor colorWithWhite:0.85 alpha:1.0] :
-        [NSColor colorWithWhite:0.2 alpha:1.0];
+        [NSColor colorWithWhite:0.965 alpha:1.0];
     
+    // Clear text color
+    NSColor* textColor = isDarkMode ?
+        [NSColor colorWithWhite:0.9 alpha:1.0] :
+        [NSColor colorWithWhite:0.05 alpha:1.0];
+    
+    // Block-style paragraph formatting
     NSMutableParagraphStyle* paragraphStyle = [[NSMutableParagraphStyle alloc] init];
-    [paragraphStyle setParagraphSpacingBefore:8];
-    [paragraphStyle setParagraphSpacing:8];
-    [paragraphStyle setFirstLineHeadIndent:16];
-    [paragraphStyle setHeadIndent:16];
-    [paragraphStyle setTailIndent:-16];
+    [paragraphStyle setLineHeightMultiple:1.45];       // Comfortable line height
+    [paragraphStyle setParagraphSpacingBefore:16];     // Space before block
+    [paragraphStyle setParagraphSpacing:16];           // Space after block  
+    [paragraphStyle setFirstLineHeadIndent:16];        // Left padding
+    [paragraphStyle setHeadIndent:16];                 // Left padding for all lines
+    [paragraphStyle setTailIndent:-16];                // Right padding (negative from right edge)
     
     return @{
         NSFontAttributeName: font,
         NSForegroundColorAttributeName: textColor,
         NSBackgroundColorAttributeName: bgColor,
-        NSParagraphStyleAttributeName: paragraphStyle
+        NSParagraphStyleAttributeName: paragraphStyle,
+        NSKernAttributeName: @(0.0)  // No extra letter spacing for code
     };
 }
 
@@ -294,27 +346,35 @@
                 
                 [result appendAttributedString:codeBlock];
             } else if ([codeContent length] > 0) {
-                // Regular code block
+                // Simple, clean code block like GitHub
                 nodeAttrs = [self codeBlockAttributesForDarkMode:isDarkMode];
                 
                 NSMutableAttributedString* codeBlock = [[NSMutableAttributedString alloc] init];
                 
-                // If we have a language, add it as a label
-                if (language) {
-                    NSFont* smallFont = [NSFont monospacedSystemFontOfSize:10 weight:NSFontWeightRegular];
-                    NSColor* langColor = isDarkMode ? 
-                        [NSColor colorWithWhite:0.6 alpha:1.0] : 
-                        [NSColor colorWithWhite:0.5 alpha:1.0];
-                    NSDictionary* langAttrs = @{
-                        NSFontAttributeName: smallFont,
-                        NSForegroundColorAttributeName: langColor
-                    };
-                    [codeBlock appendAttributedString:[[NSAttributedString alloc] 
-                        initWithString:[NSString stringWithFormat:@"// %@\n", language]
-                        attributes:langAttrs]];
+                // Add newline before block
+                if ([result length] > 0) {
+                    [codeBlock appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
                 }
                 
-                // Add the code content
+                // Language label (if present) - subtle and integrated
+                if (language) {
+                    NSFont* labelFont = [NSFont systemFontOfSize:11 weight:NSFontWeightLight];
+                    NSColor* labelColor = isDarkMode ? 
+                        [NSColor colorWithWhite:0.6 alpha:0.7] : 
+                        [NSColor colorWithWhite:0.5 alpha:0.7];
+                    
+                    NSDictionary* labelAttrs = @{
+                        NSFontAttributeName: labelFont,
+                        NSForegroundColorAttributeName: labelColor,
+                        NSKernAttributeName: @(0.5)
+                    };
+                    
+                    NSString* labelText = [NSString stringWithFormat:@"%@\n", [language lowercaseString]];
+                    [codeBlock appendAttributedString:[[NSAttributedString alloc] 
+                        initWithString:labelText attributes:labelAttrs]];
+                }
+                
+                // Add the code content as-is with block attributes
                 [codeBlock appendAttributedString:[[NSAttributedString alloc] 
                     initWithString:codeContent attributes:nodeAttrs]];
                 
@@ -354,26 +414,68 @@
                 [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
             }
             
-            // Add proper indentation
+            // Golden ratio indentation (21pt per level)
             NSMutableString* indent = [NSMutableString string];
-            for (NSInteger i = 0; i < indentLevel; i++) {
-                [indent appendString:@"    "];
+            CGFloat indentPoints = 21.0f * indentLevel;  // Golden ratio spacing
+            
+            // Add bullet or number with refined typography
+            BOOL isOrdered = node->list_ordered;
+            
+            // Create paragraph style with hanging indent for clean alignment
+            NSMutableParagraphStyle* listStyle = [[NSMutableParagraphStyle alloc] init];
+            [listStyle setFirstLineHeadIndent:indentPoints];
+            [listStyle setHeadIndent:indentPoints + 24];  // Bullet + space width
+            [listStyle setParagraphSpacing:18];  // More breathing room between items
+            [listStyle setParagraphSpacingBefore:10];  // Add space before each item
+            [listStyle setLineHeightMultiple:1.5];  // Comfortable line height
+            
+            NSMutableDictionary* listAttrs = [currentAttrs mutableCopy];
+            listAttrs[NSParagraphStyleAttributeName] = listStyle;
+            
+            // Elegant bullet or number styling
+            NSString* marker;
+            NSDictionary* markerAttrs;
+            
+            if (isOrdered) {
+                marker = [NSString stringWithFormat:@"%d.", node->list_start];
+                // Use a lighter weight for numbers
+                NSFont* numberFont = [NSFont fontWithName:@"HelveticaNeue-Light" size:15] ?: 
+                                    [NSFont systemFontOfSize:15 weight:NSFontWeightLight];
+                NSColor* numberColor = isDarkMode ? 
+                    [NSColor colorWithWhite:0.6 alpha:0.8] : 
+                    [NSColor colorWithWhite:0.3 alpha:0.8];
+                markerAttrs = @{
+                    NSFontAttributeName: numberFont,
+                    NSForegroundColorAttributeName: numberColor
+                };
+            } else {
+                // Use a refined bullet character
+                marker = @"•";  // Clean bullet
+                NSFont* bulletFont = [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
+                NSColor* bulletColor = isDarkMode ? 
+                    [NSColor colorWithWhite:0.5 alpha:0.6] : 
+                    [NSColor colorWithWhite:0.2 alpha:0.6];
+                markerAttrs = @{
+                    NSFontAttributeName: bulletFont,
+                    NSForegroundColorAttributeName: bulletColor,
+                    NSBaselineOffsetAttributeName: @(1)  // Slight vertical adjustment
+                };
             }
             
-            // Add bullet or number - check parent to determine if ordered
-            BOOL isOrdered = NO;
-            if (node->list_ordered || indentLevel > 0) {
-                // For nested lists, we need to check the context
-                isOrdered = node->list_ordered;
+            // Add indentation
+            if (indentLevel > 0) {
+                [result appendAttributedString:[[NSAttributedString alloc] 
+                    initWithString:indent attributes:currentAttrs]];
             }
             
-            NSString* marker = isOrdered ? 
-                [NSString stringWithFormat:@"%d. ", node->list_start] : @"• ";
+            // Add marker with spacing
+            [result appendAttributedString:[[NSAttributedString alloc] 
+                initWithString:marker attributes:markerAttrs]];
+            [result appendAttributedString:[[NSAttributedString alloc] 
+                initWithString:@"  " attributes:currentAttrs]];  // Elegant spacing
             
-            [result appendAttributedString:[[NSAttributedString alloc] 
-                initWithString:indent attributes:currentAttrs]];
-            [result appendAttributedString:[[NSAttributedString alloc] 
-                initWithString:marker attributes:currentAttrs]];
+            // Update current attributes for list content
+            [currentAttrs addEntriesFromDictionary:listAttrs];
             break;
         }
         

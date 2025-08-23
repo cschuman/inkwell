@@ -79,15 +79,16 @@ struct AnimationCurve {
 };
 
 struct DesignTokens {
-    // Spacing scale (in points)
+    // Spacing scale - Golden Ratio based
     struct Spacing {
-        static constexpr float xs = 4;
-        static constexpr float sm = 8;
-        static constexpr float md = 16;
-        static constexpr float lg = 24;
-        static constexpr float xl = 32;
-        static constexpr float xxl = 48;
-        static constexpr float xxxl = 64;
+        static constexpr float xs = 2;     // Micro spacing
+        static constexpr float sm = 5;     // xs * 2.5
+        static constexpr float md = 8;     // sm * 1.6
+        static constexpr float lg = 13;    // md * 1.625 (≈φ)
+        static constexpr float xl = 21;    // lg * 1.615 (≈φ)
+        static constexpr float xxl = 34;   // xl * 1.619 (≈φ)
+        static constexpr float xxxl = 55;  // xxl * 1.617 (≈φ)
+        static constexpr float huge = 89;  // xxxl * 1.618 (φ)
     };
     
     // Border radius scale
@@ -100,34 +101,47 @@ struct DesignTokens {
         static constexpr float full = 9999;
     };
     
-    // Typography scale
+    // Typography scale - Golden Ratio based (1.618)
     struct Typography {
         struct Size {
-            static constexpr float xs = 11;
-            static constexpr float sm = 13;
-            static constexpr float base = 15;
-            static constexpr float lg = 17;
-            static constexpr float xl = 20;
-            static constexpr float xxl = 24;
-            static constexpr float xxxl = 32;
-            static constexpr float display = 48;
+            static constexpr float xs = 10;
+            static constexpr float sm = 12;
+            static constexpr float base = 16;  // Base size
+            static constexpr float lg = 20;    // 16 * 1.25
+            static constexpr float xl = 26;    // 16 * 1.618
+            static constexpr float xxl = 42;   // 26 * 1.618
+            static constexpr float xxxl = 68;  // 42 * 1.618
+            static constexpr float display = 110; // 68 * 1.618
         };
         
         struct Weight {
-            static constexpr float thin = 100;
+            static constexpr float hairline = 100;
+            static constexpr float thin = 200;
             static constexpr float light = 300;
             static constexpr float regular = 400;
             static constexpr float medium = 500;
             static constexpr float semibold = 600;
             static constexpr float bold = 700;
+            static constexpr float heavy = 800;
             static constexpr float black = 900;
         };
         
         struct LineHeight {
-            static constexpr float tight = 1.2f;
-            static constexpr float normal = 1.5f;
-            static constexpr float relaxed = 1.75f;
+            static constexpr float compressed = 1.0f;
+            static constexpr float tight = 1.25f;
+            static constexpr float normal = 1.618f;  // Golden ratio
+            static constexpr float relaxed = 1.8f;
             static constexpr float loose = 2.0f;
+            static constexpr float airy = 2.618f;    // Golden ratio squared
+        };
+        
+        struct LetterSpacing {
+            static constexpr float compressed = -0.03f;
+            static constexpr float tight = -0.01f;
+            static constexpr float normal = 0.0f;
+            static constexpr float relaxed = 0.02f;
+            static constexpr float loose = 0.05f;
+            static constexpr float wide = 0.1f;
         };
     };
     
@@ -146,27 +160,27 @@ struct DesignTokens {
 class Theme {
 public:
     struct Colors {
-        // Brand colors
-        Color primary = Color::fromHex(0x007AFF);
-        Color secondary = Color::fromHex(0x5856D6);
-        Color accent = Color::fromHex(0xFF3B30);
+        // Monochromatic Bauhaus palette - Pure black and white with grays
+        Color primary = Color::fromHex(0x000000);  // Pure black
+        Color secondary = Color::fromHex(0x1A1A1A); // Near black
+        Color accent = Color::fromHex(0xE63946);    // Bauhaus red accent
         
-        // Semantic colors
-        Color success = Color::fromHex(0x34C759);
-        Color warning = Color::fromHex(0xFF9500);
-        Color error = Color::fromHex(0xFF3B30);
-        Color info = Color::fromHex(0x007AFF);
+        // Semantic colors - Muted and refined
+        Color success = Color::fromHex(0x2A2A2A);
+        Color warning = Color::fromHex(0x4A4A4A);
+        Color error = Color::fromHex(0xE63946);
+        Color info = Color::fromHex(0x1A1A1A);
         
-        // Background layers
-        Color background = Color::fromHex(0xFFFFFF);
-        Color surface = Color::fromHex(0xF2F2F7);
-        Color elevated = Color::fromHex(0xFFFFFF);
+        // Background layers - Clean whites and subtle grays
+        Color background = Color::fromHex(0xFAFAFA);   // Off-white
+        Color surface = Color::fromHex(0xFFFFFF);      // Pure white
+        Color elevated = Color::fromHex(0xFFFFFF);     // Pure white
         
-        // Text colors
-        Color text_primary = Color::fromHex(0x000000, 0.85f);
-        Color text_secondary = Color::fromHex(0x3C3C43, 0.6f);
-        Color text_tertiary = Color::fromHex(0x3C3C43, 0.3f);
-        Color text_inverted = Color::fromHex(0xFFFFFF);
+        // Text colors - High contrast and legibility
+        Color text_primary = Color::fromHex(0x0A0A0A, 0.95f);   // Near black
+        Color text_secondary = Color::fromHex(0x4A4A4A, 0.8f);  // Medium gray
+        Color text_tertiary = Color::fromHex(0x8A8A8A, 0.7f);   // Light gray
+        Color text_inverted = Color::fromHex(0xFAFAFA);
         
         // UI element colors
         Color border = Color::fromHex(0xC6C6C8, 0.5f);

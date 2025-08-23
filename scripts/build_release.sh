@@ -3,7 +3,7 @@
 echo "🚀 Building Inkwell Release Version"
 echo "===================================="
 
-VERSION="1.0.2"
+VERSION="1.0.7"
 BUILD_DIR="build_release"
 
 # Clean previous builds

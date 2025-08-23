@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Inkwell VERSION 1.0.6 LANGUAGES CXX OBJCXX)
+project(Inkwell VERSION 1.0.7 LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,6 +69,7 @@ target_link_libraries(mdviewer_platform PUBLIC
 # UI Design System library
 add_library(mdviewer_ui STATIC
     src/ui/design_system.cpp
+    src/ui/settings_manager.mm
     src/ui/platform_effects.mm
     src/ui/enhanced_window.mm
     src/ui/smooth_scroll.mm
@@ -99,6 +100,7 @@ target_link_libraries(mdviewer_rendering PUBLIC
 add_executable(Inkwell
     src/main.mm
     src/platform/macos/main_window.mm
+    src/platform/macos/settings_window.mm
     src/ui/command_palette.mm
     src/effects/base_drag_effect.mm
     src/effects/effect_manager.mm
