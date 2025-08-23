@@ -1363,6 +1363,7 @@ extern "C" void showSettingsWindow();
     [(VimTextView*)_textView setMarkdownController:self];
     [_textView setEditable:NO];
     [_textView setSelectable:YES];
+    [_textView setDelegate:self]; // Set delegate to handle link clicks
     
     // Initialize font size tracking with golden ratio base
     _baseFontSize = 16.0;  // Base size for golden ratio scale
@@ -2449,7 +2450,41 @@ extern "C" void showSettingsWindow();
 
 - (BOOL)textView:(NSTextView*)textView clickedOnLink:(id)link atIndex:(NSUInteger)charIndex {
     if ([link isKindOfClass:[NSURL class]]) {
-        [[NSWorkspace sharedWorkspace] openURL:(NSURL*)link];
+        NSURL* url = (NSURL*)link;
+        
+        // Handle our custom copy URL scheme for code blocks
+        if ([[url scheme] isEqualToString:@"inkwell-copy"]) {
+            // Extract block ID from URL
+            NSString* blockIdStr = [[url host] stringByReplacingOccurrencesOfString:@"block-" withString:@""];
+            NSUInteger targetBlockId = [blockIdStr integerValue];
+            
+            // Search for the code content with matching block ID
+            __block NSString* codeContent = nil;
+            [[textView textStorage] enumerateAttributesInRange:NSMakeRange(0, [[textView textStorage] length])
+                                                       options:0
+                                                    usingBlock:^(NSDictionary* attrs, NSRange range, BOOL* stop) {
+                NSNumber* blockId = attrs[@"BlockId"];
+                if (blockId && [blockId unsignedIntegerValue] == targetBlockId && attrs[@"CodeContent"]) {
+                    codeContent = attrs[@"CodeContent"];
+                    *stop = YES;
+                }
+            }];
+            
+            if (codeContent) {
+                // Copy to clipboard
+                NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
+                [pasteboard clearContents];
+                [pasteboard setString:codeContent forType:NSPasteboardTypeString];
+                
+                // Simple console log for now
+                NSLog(@"Code copied to clipboard!");
+            }
+            
+            return YES; // We handled this link
+        }
+        
+        // For regular URLs, open them
+        [[NSWorkspace sharedWorkspace] openURL:url];
         return YES; // We handled the link
     }
     return NO;

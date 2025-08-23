@@ -13,6 +13,23 @@
 @property (assign) NSRange attachmentRange;
 @end
 
+// Custom text attachment for code blocks with full-width container
+@interface CodeBlockTextAttachment : NSTextAttachment
+@property (strong) NSString* codeContent;
+@property (strong) NSString* language;
+@property (assign) BOOL isDarkMode;
+@property (assign) NSUInteger blockId;
+@end
+
+@interface CodeBlockTextAttachmentCell : NSTextAttachmentCell {
+    NSString* _codeContent;
+    NSString* _language;
+    BOOL _isDarkMode;
+    NSUInteger _blockId;
+}
+- (instancetype)initWithCode:(NSString*)code language:(NSString*)lang isDarkMode:(BOOL)isDarkMode blockId:(NSUInteger)blockId;
+@end
+
 @implementation MermaidTextAttachment
 
 - (instancetype)initWithMermaidCode:(NSString*)code isDarkMode:(BOOL)isDarkMode {
@@ -81,6 +98,155 @@
                 }
             }];
         }
+    }
+    return self;
+}
+
+@end
+
+@implementation CodeBlockTextAttachmentCell
+
+- (instancetype)initWithCode:(NSString*)code language:(NSString*)lang isDarkMode:(BOOL)isDarkMode blockId:(NSUInteger)blockId {
+    self = [super init];
+    if (self) {
+        _codeContent = [code copy];
+        _language = [lang copy];
+        _isDarkMode = isDarkMode;
+        _blockId = blockId;
+    }
+    return self;
+}
+
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView*)controlView {
+    // Full-width container with rounded corners
+    NSColor* bgColor = _isDarkMode ? 
+        [NSColor colorWithRed:0.11 green:0.12 blue:0.13 alpha:1.0] :  
+        [NSColor colorWithRed:0.96 green:0.97 blue:0.98 alpha:1.0];
+    
+    [bgColor set];
+    NSBezierPath* path = [NSBezierPath bezierPathWithRoundedRect:cellFrame 
+                                                         xRadius:6 
+                                                         yRadius:6];
+    [path fill];
+    
+    // Subtle border
+    NSColor* borderColor = _isDarkMode ?
+        [NSColor colorWithWhite:0.2 alpha:0.3] :
+        [NSColor colorWithWhite:0.0 alpha:0.1];
+    [borderColor set];
+    [path setLineWidth:0.5];
+    [path stroke];
+    
+    NSFont* font = [NSFont fontWithName:@"SF Mono" size:13] ?:
+                   [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
+    
+    CGFloat yOffset = cellFrame.origin.y + 16;
+    CGFloat xOffset = cellFrame.origin.x + 16;
+    
+    // Draw header with language and copy button in TOP-RIGHT
+    if (_language) {
+        NSFont* labelFont = [NSFont systemFontOfSize:11 weight:NSFontWeightLight];
+        NSColor* labelColor = _isDarkMode ? 
+            [NSColor colorWithWhite:0.6 alpha:0.8] : 
+            [NSColor colorWithWhite:0.4 alpha:0.8];
+        
+        NSDictionary* labelAttrs = @{
+            NSFontAttributeName: labelFont,
+            NSForegroundColorAttributeName: labelColor
+        };
+        
+        // Language label
+        NSString* labelText = [_language lowercaseString];
+        NSSize labelSize = [labelText sizeWithAttributes:labelAttrs];
+        
+        // Position in top-right corner
+        CGFloat rightMargin = 16;
+        CGFloat labelX = cellFrame.origin.x + cellFrame.size.width - labelSize.width - rightMargin - 20; // Extra space for icon
+        
+        [labelText drawAtPoint:NSMakePoint(labelX, yOffset) withAttributes:labelAttrs];
+        
+        // Copy icon
+        if (@available(macOS 11.0, *)) {
+            NSImage* copyIcon = [NSImage imageWithSystemSymbolName:@"doc.on.doc" 
+                                         accessibilityDescription:@"Copy code"];
+            if (copyIcon) {
+                [copyIcon setSize:NSMakeSize(14, 14)];
+                CGFloat iconX = cellFrame.origin.x + cellFrame.size.width - rightMargin - 14;
+                NSRect iconRect = NSMakeRect(iconX, yOffset, 14, 14);
+                
+                // Tint the icon
+                NSImage* tintedIcon = [copyIcon copy];
+                [tintedIcon lockFocus];
+                [labelColor set];
+                NSRect imageRect = {NSZeroPoint, NSMakeSize(14, 14)};
+                NSRectFillUsingOperation(imageRect, NSCompositingOperationSourceAtop);
+                [tintedIcon unlockFocus];
+                
+                [tintedIcon drawInRect:iconRect];
+            }
+        } else {
+            // Fallback - use unicode copy symbol
+            NSString* copySymbol = @"⎘";
+            NSSize symbolSize = [copySymbol sizeWithAttributes:labelAttrs];
+            CGFloat symbolX = cellFrame.origin.x + cellFrame.size.width - rightMargin - symbolSize.width;
+            [copySymbol drawAtPoint:NSMakePoint(symbolX, yOffset) withAttributes:labelAttrs];
+        }
+        
+        yOffset += 24; // Space after header
+    }
+    
+    // Draw code content with slightly more line spacing
+    NSColor* textColor = _isDarkMode ?
+        [NSColor colorWithWhite:0.9 alpha:1.0] :
+        [NSColor colorWithWhite:0.05 alpha:1.0];
+    
+    NSDictionary* codeAttrs = @{
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: textColor
+    };
+    
+    NSArray* lines = [_codeContent componentsSeparatedByString:@"\n"];
+    CGFloat lineHeight = font.capHeight + font.leading + 4; // Slightly more line spacing
+    
+    for (NSString* line in lines) {
+        [line drawAtPoint:NSMakePoint(xOffset, yOffset) withAttributes:codeAttrs];
+        yOffset += lineHeight;
+    }
+}
+
+- (NSSize)cellSize {
+    NSFont* font = [NSFont fontWithName:@"SF Mono" size:13] ?:
+                   [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
+    
+    NSArray* lines = [_codeContent componentsSeparatedByString:@"\n"];
+    CGFloat lineHeight = font.capHeight + font.leading + 4; // Match the drawing line height
+    CGFloat contentHeight = lines.count * lineHeight + 32;
+    
+    if (_language) {
+        contentHeight += 24;
+    }
+    
+    return NSMakeSize(700, contentHeight);
+}
+
+@end
+
+@implementation CodeBlockTextAttachment
+
+- (instancetype)initWithCode:(NSString*)code language:(NSString*)lang isDarkMode:(BOOL)isDarkMode blockId:(NSUInteger)blockId {
+    self = [super init];
+    if (self) {
+        _codeContent = code;
+        _language = lang;
+        _isDarkMode = isDarkMode;
+        _blockId = blockId;
+        
+        CodeBlockTextAttachmentCell* cell = [[CodeBlockTextAttachmentCell alloc] 
+            initWithCode:code 
+            language:lang 
+            isDarkMode:isDarkMode
+            blockId:blockId];
+        [self setAttachmentCell:cell];
     }
     return self;
 }
@@ -200,21 +366,21 @@
                    [NSFont fontWithName:@"JetBrainsMono-Regular" size:13] ?:
                    [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
     
-    // GitHub-style background - subtle but visible
+    // More prominent background color for better differentiation
     NSColor* bgColor = isDarkMode ? 
-        [NSColor colorWithWhite:0.1 alpha:1.0] : 
-        [NSColor colorWithWhite:0.965 alpha:1.0];
+        [NSColor colorWithRed:0.11 green:0.12 blue:0.13 alpha:1.0] :  // #1c1f21
+        [NSColor colorWithRed:0.96 green:0.97 blue:0.98 alpha:1.0];   // #f5f8fa
     
     // Clear text color
     NSColor* textColor = isDarkMode ?
         [NSColor colorWithWhite:0.9 alpha:1.0] :
         [NSColor colorWithWhite:0.05 alpha:1.0];
     
-    // Block-style paragraph formatting
+    // Block-style paragraph formatting with TIGHT line height
     NSMutableParagraphStyle* paragraphStyle = [[NSMutableParagraphStyle alloc] init];
-    [paragraphStyle setLineHeightMultiple:1.45];       // Comfortable line height
-    [paragraphStyle setParagraphSpacingBefore:16];     // Space before block
-    [paragraphStyle setParagraphSpacing:16];           // Space after block  
+    [paragraphStyle setLineSpacing:2];                 // Minimal line spacing
+    [paragraphStyle setParagraphSpacingBefore:0];      // We handle spacing separately
+    [paragraphStyle setParagraphSpacing:0];            // We handle spacing separately
     [paragraphStyle setFirstLineHeadIndent:16];        // Left padding
     [paragraphStyle setHeadIndent:16];                 // Left padding for all lines
     [paragraphStyle setTailIndent:-16];                // Right padding (negative from right edge)
@@ -346,39 +512,54 @@
                 
                 [result appendAttributedString:codeBlock];
             } else if ([codeContent length] > 0) {
-                // Simple, clean code block like GitHub
-                nodeAttrs = [self codeBlockAttributesForDarkMode:isDarkMode];
+                // Use text attachment for proper full-width rendering
                 
-                NSMutableAttributedString* codeBlock = [[NSMutableAttributedString alloc] init];
-                
-                // Add newline before block
+                // Standardized spacing: always add consistent space before code blocks
                 if ([result length] > 0) {
-                    [codeBlock appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
+                    // Ensure we have exactly 2 newlines before the code block for consistent spacing
+                    NSString* currentEnd = [[result string] substringFromIndex:MAX(0, [result length] - 2)];
+                    if ([currentEnd hasSuffix:@"\n\n"]) {
+                        // Already have enough spacing
+                    } else if ([currentEnd hasSuffix:@"\n"]) {
+                        // Have one newline, add one more
+                        [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
+                    } else {
+                        // No newlines, add two
+                        [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n"]];
+                    }
                 }
                 
-                // Language label (if present) - subtle and integrated
+                // Generate unique ID for this code block
+                static NSUInteger codeBlockCounter = 0;
+                NSUInteger blockId = codeBlockCounter++;
+                
+                // Create the code block attachment with full visual design
+                CodeBlockTextAttachment* codeBlockAttachment = [[CodeBlockTextAttachment alloc] 
+                    initWithCode:codeContent 
+                    language:language 
+                    isDarkMode:isDarkMode
+                    blockId:blockId];
+                
+                // Create attributed string with the attachment
+                NSMutableAttributedString* attachmentString = [[NSMutableAttributedString attributedStringWithAttachment:codeBlockAttachment] mutableCopy];
+                
+                // Add attributes for copy functionality
+                NSMutableDictionary* attrs = [[NSMutableDictionary alloc] init];
+                attrs[@"CodeContent"] = codeContent;
+                attrs[@"BlockId"] = @(blockId);
+                
+                // Add clickable link for copy button (overlaid on attachment)
                 if (language) {
-                    NSFont* labelFont = [NSFont systemFontOfSize:11 weight:NSFontWeightLight];
-                    NSColor* labelColor = isDarkMode ? 
-                        [NSColor colorWithWhite:0.6 alpha:0.7] : 
-                        [NSColor colorWithWhite:0.5 alpha:0.7];
-                    
-                    NSDictionary* labelAttrs = @{
-                        NSFontAttributeName: labelFont,
-                        NSForegroundColorAttributeName: labelColor,
-                        NSKernAttributeName: @(0.5)
-                    };
-                    
-                    NSString* labelText = [NSString stringWithFormat:@"%@\n", [language lowercaseString]];
-                    [codeBlock appendAttributedString:[[NSAttributedString alloc] 
-                        initWithString:labelText attributes:labelAttrs]];
+                    NSURL* copyURL = [NSURL URLWithString:[NSString stringWithFormat:@"inkwell-copy://block-%lu", blockId]];
+                    attrs[NSLinkAttributeName] = copyURL;
+                    attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleNone);
                 }
                 
-                // Add the code content as-is with block attributes
-                [codeBlock appendAttributedString:[[NSAttributedString alloc] 
-                    initWithString:codeContent attributes:nodeAttrs]];
+                [attachmentString addAttributes:attrs range:NSMakeRange(0, 1)];
+                [result appendAttributedString:attachmentString];
                 
-                [result appendAttributedString:codeBlock];
+                // Standardized spacing: always add consistent space after code blocks
+                [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n\n"]];
             }
             
             shouldRenderChildren = NO;
@@ -427,7 +608,7 @@
             [listStyle setHeadIndent:indentPoints + 24];  // Bullet + space width
             [listStyle setParagraphSpacing:18];  // More breathing room between items
             [listStyle setParagraphSpacingBefore:10];  // Add space before each item
-            [listStyle setLineHeightMultiple:1.5];  // Comfortable line height
+            [listStyle setLineHeightMultiple:1.6];  // Slightly more comfortable line height
             
             NSMutableDictionary* listAttrs = [currentAttrs mutableCopy];
             listAttrs[NSParagraphStyleAttributeName] = listStyle;
