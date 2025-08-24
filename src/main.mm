@@ -1177,50 +1177,71 @@ extern "C" void showSettingsWindow();
     view.controller = self;
     view.wantsLayer = YES;  // Enable layer backing for effects
     
-    // Create search bar (hidden by default, at top)
-    NSRect searchFrame = NSMakeRect(0, frame.size.height - 40, frame.size.width, 40);
+    // Create search bar (hidden by default, at top) with better design
+    NSRect searchFrame = NSMakeRect(0, frame.size.height - 36, frame.size.width, 36);
     _searchBar = [[NSView alloc] initWithFrame:searchFrame];
     [_searchBar setWantsLayer:YES];
-    _searchBar.layer.backgroundColor = [[NSColor controlBackgroundColor] CGColor];
+    
+    // Modern, minimal search bar design
+    _searchBar.layer.backgroundColor = [[NSColor colorWithWhite:0.97 alpha:0.98] CGColor];
+    if (@available(macOS 10.14, *)) {
+        NSAppearance* appearance = [NSApp effectiveAppearance];
+        if ([appearance.name containsString:@"Dark"]) {
+            _searchBar.layer.backgroundColor = [[NSColor colorWithWhite:0.15 alpha:0.98] CGColor];
+        }
+    }
+    
+    // Add subtle shadow
+    _searchBar.layer.shadowColor = [[NSColor blackColor] CGColor];
+    _searchBar.layer.shadowOpacity = 0.1;
+    _searchBar.layer.shadowOffset = CGSizeMake(0, -1);
+    _searchBar.layer.shadowRadius = 3;
+    
     _searchBar.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     [_searchBar setHidden:YES];
     
-    // Search field
-    _searchField = [[NSSearchField alloc] initWithFrame:NSMakeRect(10, 8, 250, 24)];
+    // Search field with better styling
+    _searchField = [[NSSearchField alloc] initWithFrame:NSMakeRect(10, 6, 250, 24)];
     [_searchField setPlaceholderString:@"Search"];
     [_searchField setDelegate:self];
     [_searchField setTarget:self];
     [_searchField setAction:@selector(searchFieldDidChange:)];
+    [_searchField setFocusRingType:NSFocusRingTypeNone];
+    [_searchField setBordered:YES];
+    [_searchField setBezeled:YES];
+    [_searchField setBezelStyle:NSTextFieldRoundedBezel];
     [_searchBar addSubview:_searchField];
     
-    // Previous button
-    _previousButton = [[NSButton alloc] initWithFrame:NSMakeRect(270, 8, 30, 24)];
+    // Previous button with better positioning
+    _previousButton = [[NSButton alloc] initWithFrame:NSMakeRect(270, 6, 30, 24)];
     [_previousButton setTitle:@"◀"];
-    [_previousButton setBezelStyle:NSBezelStyleRounded];
+    [_previousButton setBezelStyle:NSBezelStyleTexturedRounded];
     [_previousButton setTarget:self];
     [_previousButton setAction:@selector(findPrevious)];
     [_searchBar addSubview:_previousButton];
     
-    // Next button  
-    _nextButton = [[NSButton alloc] initWithFrame:NSMakeRect(305, 8, 30, 24)];
+    // Next button with better positioning
+    _nextButton = [[NSButton alloc] initWithFrame:NSMakeRect(305, 6, 30, 24)];
     [_nextButton setTitle:@"▶"];
-    [_nextButton setBezelStyle:NSBezelStyleRounded];
+    [_nextButton setBezelStyle:NSBezelStyleTexturedRounded];
     [_nextButton setTarget:self];
     [_nextButton setAction:@selector(findNext)];
     [_searchBar addSubview:_nextButton];
     
-    // Results label
-    _searchResultLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(345, 8, 150, 24)];
+    // Results label with better positioning
+    _searchResultLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(345, 8, 150, 20)];
     [_searchResultLabel setEditable:NO];
     [_searchResultLabel setBordered:NO];
     [_searchResultLabel setBackgroundColor:[NSColor clearColor]];
     [_searchResultLabel setStringValue:@""];
+    [_searchResultLabel setFont:[NSFont systemFontOfSize:12]];
+    [_searchResultLabel setTextColor:[NSColor secondaryLabelColor]];
     [_searchBar addSubview:_searchResultLabel];
     
-    // Close button
-    NSButton* closeButton = [[NSButton alloc] initWithFrame:NSMakeRect(frame.size.width - 35, 8, 25, 24)];
+    // Close button - more subtle
+    NSButton* closeButton = [[NSButton alloc] initWithFrame:NSMakeRect(frame.size.width - 32, 6, 24, 24)];
     [closeButton setTitle:@"✕"];
-    [closeButton setBezelStyle:NSBezelStyleRounded];
+    [closeButton setBezelStyle:NSBezelStyleTexturedRounded];
     [closeButton setTarget:self];
     [closeButton setAction:@selector(hideSearchBar)];
     closeButton.autoresizingMask = NSViewMinXMargin;
@@ -2210,11 +2231,10 @@ extern "C" void showSettingsWindow();
     
     // Adjust scroll view frame to make room for search bar
     NSRect scrollFrame = _scrollView.frame;
-    scrollFrame.size.height = self.view.frame.size.height - 22 - 40; // status bar + search bar
+    scrollFrame.size.height = self.view.frame.size.height - 22 - 36; // status bar + search bar
     [_scrollView setFrame:scrollFrame];
     
-    // Focus on search field and ensure it's visible
-    [_searchField setStringValue:@""];
+    // Focus on search field WITHOUT clearing it (keep existing text if any)
     [[self.view window] makeFirstResponder:_searchField];
     [_searchField becomeFirstResponder];
     
