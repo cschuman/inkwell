@@ -1319,7 +1319,28 @@ typedef NS_ENUM(NSInteger, FileSortMode) {
     fileBrowserTitle.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
     [fileBrowserContainer addSubview:fileBrowserTitle];
     
-    // Add refresh button for file browser
+    // Add sort button for file browser (MIDDLE)
+    _sortButton = [[NSButton alloc] initWithFrame:NSMakeRect(142, splitFrame.size.height - 26, 24, 22)];
+    if (@available(macOS 11.0, *)) {
+        NSImage* sortIcon = [NSImage imageWithSystemSymbolName:@"arrow.up.arrow.down" accessibilityDescription:@"Sort"];
+        if (sortIcon) {
+            [sortIcon setSize:NSMakeSize(12, 12)];
+            [_sortButton setImage:sortIcon];
+        } else {
+            [_sortButton setTitle:@"↕"];
+        }
+    } else {
+        [_sortButton setTitle:@"↕"];
+    }
+    [_sortButton setBezelStyle:NSBezelStyleTexturedRounded];
+    [_sortButton setBordered:YES];
+    [_sortButton setTarget:self];
+    [_sortButton setAction:@selector(toggleFileSort)];
+    [_sortButton setToolTip:@"Toggle sort: Name/Date"];
+    _sortButton.autoresizingMask = NSViewMinYMargin | NSViewMinXMargin;
+    [fileBrowserContainer addSubview:_sortButton];
+    
+    // Add refresh button for file browser (RIGHT)
     NSButton* refreshButton = [[NSButton alloc] initWithFrame:NSMakeRect(170, splitFrame.size.height - 26, 24, 22)];
     if (@available(macOS 11.0, *)) {
         NSImage* refreshIcon = [NSImage imageWithSystemSymbolName:@"arrow.clockwise" accessibilityDescription:@"Refresh"];
@@ -1952,12 +1973,21 @@ typedef NS_ENUM(NSInteger, FileSortMode) {
         // NEW FILE: Reset to top - fresh canvas
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [[_scrollView documentView] scrollPoint:NSMakePoint(0, 0)];
-            NSLog(@"Reset scroll position for new file: %@", path);
+            NSLog(@"===== SCROLL RESET: New file opened, starting at top =====");
+            NSLog(@"File: %@", path);
+            
+            // Flash the text view background to show reset
+            NSColor* originalColor = [_textView backgroundColor];
+            [_textView setBackgroundColor:[NSColor colorWithRed:0.9 green:1.0 blue:0.9 alpha:1.0]];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [_textView setBackgroundColor:originalColor];
+            });
         });
     } else {
         // SAME FILE (reload): Restore previous position
         [self restoreScrollPosition];
-        NSLog(@"Restored scroll position for reloaded file: %@", path);
+        NSLog(@"===== SCROLL RESTORE: Same file reloaded, keeping position =====");
+        NSLog(@"File: %@", path);
     }
     
     // Start watching file
@@ -3038,6 +3068,41 @@ typedef NS_ENUM(NSInteger, FileSortMode) {
 - (void)stopWatchingFolder {
     // TODO: Stop FSEvents watching
     NSLog(@"Would stop FSEvents watching here");
+}
+
+- (void)toggleFileSort {
+    // Toggle between name and date sorting
+    _fileSortMode = (_fileSortMode == FileSortByName) ? FileSortByDateModified : FileSortByName;
+    
+    // Update button tooltip to show current mode
+    NSString* tooltipText = (_fileSortMode == FileSortByName) ? 
+        @"Sorting by: Name (click for Date)" : 
+        @"Sorting by: Date Modified (click for Name)";
+    [_sortButton setToolTip:tooltipText];
+    
+    // Update button appearance to indicate mode
+    if (@available(macOS 11.0, *)) {
+        NSString* iconName = (_fileSortMode == FileSortByName) ? 
+            @"textformat.abc" : @"clock";
+        NSImage* sortIcon = [NSImage imageWithSystemSymbolName:iconName accessibilityDescription:@"Sort"];
+        if (sortIcon) {
+            [sortIcon setSize:NSMakeSize(12, 12)];
+            [_sortButton setImage:sortIcon];
+        }
+    }
+    
+    // Refresh the file browser with new sort
+    [self refreshFileBrowser];
+    
+    NSLog(@"FILE SORT TOGGLED TO: %@", (_fileSortMode == FileSortByName) ? @"NAME" : @"DATE MODIFIED");
+    
+    // Show visual feedback
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setMessageText:@"Sort Mode Changed"];
+    [alert setInformativeText:[NSString stringWithFormat:@"Now sorting by: %@", 
+                                (_fileSortMode == FileSortByName) ? @"Name" : @"Date Modified"]];
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
 }
 
 - (void)refreshFileBrowser {
