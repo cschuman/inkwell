@@ -1034,6 +1034,12 @@ extern "C" void showSettingsWindow();
 
 @end
 
+// File sorting modes
+typedef NS_ENUM(NSInteger, FileSortMode) {
+    FileSortByName = 0,
+    FileSortByDateModified = 1
+};
+
 @implementation MarkdownViewController {
     // MTKView* _metalView;  // Commented out for now
     NSTextView* _textView;
@@ -1056,6 +1062,8 @@ extern "C" void showSettingsWindow();
     NSMutableArray* _fileItems;
     NSString* _currentFolderPath;
     BOOL _showingFileBrowser;
+    FileSortMode _fileSortMode;
+    NSButton* _sortButton;
     
     // Font size management
     CGFloat _currentFontSize;
@@ -1760,7 +1768,11 @@ extern "C" void showSettingsWindow();
 
 - (void)openFile:(NSString*)path {
     
+    // Check if this is a different file than what's currently open
+    BOOL isDifferentFile = (!_currentFilePath || ![_currentFilePath isEqualToString:path]);
+    
     // Store file info
+    NSString* previousFilePath = _currentFilePath;
     [_currentFilePath release];
     _currentFilePath = [path retain];
     
@@ -1935,8 +1947,18 @@ extern "C" void showSettingsWindow();
     // Update comprehensive status bar
     [self updateStatusBar];
     
-    // Restore scroll position for this file
-    [self restoreScrollPosition];
+    // Handle scroll position based on whether it's a new file or same file
+    if (isDifferentFile) {
+        // NEW FILE: Reset to top - fresh canvas
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [[_scrollView documentView] scrollPoint:NSMakePoint(0, 0)];
+            NSLog(@"Reset scroll position for new file: %@", path);
+        });
+    } else {
+        // SAME FILE (reload): Restore previous position
+        [self restoreScrollPosition];
+        NSLog(@"Restored scroll position for reloaded file: %@", path);
+    }
     
     // Start watching file
     _fileWatcher->watch([path UTF8String]);
@@ -3166,7 +3188,7 @@ extern "C" void showSettingsWindow();
         return;
     }
     
-    // Sort contents alphabetically, directories first
+    // Sort contents based on current sort mode
     NSArray* sortedContents = [contents sortedArrayUsingComparator:^NSComparisonResult(NSString* obj1, NSString* obj2) {
         NSString* path1 = [path stringByAppendingPathComponent:obj1];
         NSString* path2 = [path stringByAppendingPathComponent:obj2];
@@ -3175,10 +3197,22 @@ extern "C" void showSettingsWindow();
         [fm fileExistsAtPath:path1 isDirectory:&isDir1];
         [fm fileExistsAtPath:path2 isDirectory:&isDir2];
         
+        // Directories always come first
         if (isDir1 && !isDir2) return NSOrderedAscending;
         if (!isDir1 && isDir2) return NSOrderedDescending;
         
-        return [obj1 localizedStandardCompare:obj2];
+        // Sort by current mode
+        if (_fileSortMode == FileSortByDateModified) {
+            // Sort by modification date (newest first)
+            NSDictionary* attrs1 = [fm attributesOfItemAtPath:path1 error:nil];
+            NSDictionary* attrs2 = [fm attributesOfItemAtPath:path2 error:nil];
+            NSDate* date1 = attrs1[NSFileModificationDate];
+            NSDate* date2 = attrs2[NSFileModificationDate];
+            return [date2 compare:date1]; // Reverse for newest first
+        } else {
+            // Sort alphabetically by name
+            return [obj1 localizedStandardCompare:obj2];
+        }
     }];
     
     for (NSString* itemName in sortedContents) {
@@ -3227,7 +3261,7 @@ extern "C" void showSettingsWindow();
         return;
     }
     
-    // Sort contents alphabetically, directories first
+    // Sort contents based on current sort mode
     NSArray* sortedContents = [contents sortedArrayUsingComparator:^NSComparisonResult(NSString* obj1, NSString* obj2) {
         NSString* path1 = [path stringByAppendingPathComponent:obj1];
         NSString* path2 = [path stringByAppendingPathComponent:obj2];
@@ -3236,10 +3270,22 @@ extern "C" void showSettingsWindow();
         [fm fileExistsAtPath:path1 isDirectory:&isDir1];
         [fm fileExistsAtPath:path2 isDirectory:&isDir2];
         
+        // Directories always come first
         if (isDir1 && !isDir2) return NSOrderedAscending;
         if (!isDir1 && isDir2) return NSOrderedDescending;
         
-        return [obj1 localizedStandardCompare:obj2];
+        // Sort by current mode
+        if (_fileSortMode == FileSortByDateModified) {
+            // Sort by modification date (newest first)
+            NSDictionary* attrs1 = [fm attributesOfItemAtPath:path1 error:nil];
+            NSDictionary* attrs2 = [fm attributesOfItemAtPath:path2 error:nil];
+            NSDate* date1 = attrs1[NSFileModificationDate];
+            NSDate* date2 = attrs2[NSFileModificationDate];
+            return [date2 compare:date1]; // Reverse for newest first
+        } else {
+            // Sort alphabetically by name
+            return [obj1 localizedStandardCompare:obj2];
+        }
     }];
     
     for (NSString* itemName in sortedContents) {
