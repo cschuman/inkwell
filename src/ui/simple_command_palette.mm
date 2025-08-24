@@ -56,6 +56,8 @@
         @{@"name": @"Toggle Theme", @"action": @"toggleTheme"},
         @{@"name": @"Export as PDF", @"action": @"exportPDF"},
         @{@"name": @"Toggle Table of Contents", @"action": @"toggleTOC"},
+        @{@"name": @"Toggle File Browser", @"action": @"toggleFiles"},
+        @{@"name": @"Refresh File Browser", @"action": @"refreshFiles"},
         @{@"name": @"Search in Document", @"action": @"search"},
         @{@"name": @"Open Recent Files", @"action": @"openRecent"},
         nil];
@@ -120,6 +122,10 @@
             [[NSNotificationCenter defaultCenter] postNotificationName:@"ExportPDF" object:nil];
         } else if ([action isEqualToString:@"toggleTOC"]) {
             [[NSNotificationCenter defaultCenter] postNotificationName:@"ToggleTOC" object:nil];
+        } else if ([action isEqualToString:@"toggleFiles"]) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"ToggleFiles" object:nil];
+        } else if ([action isEqualToString:@"refreshFiles"]) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"RefreshFiles" object:nil];
         } else if ([action isEqualToString:@"search"]) {
             [[NSNotificationCenter defaultCenter] postNotificationName:@"ShowSearch" object:nil];
         }

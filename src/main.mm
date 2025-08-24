@@ -1311,6 +1311,27 @@ extern "C" void showSettingsWindow();
     fileBrowserTitle.autoresizingMask = NSViewMinYMargin | NSViewWidthSizable;
     [fileBrowserContainer addSubview:fileBrowserTitle];
     
+    // Add refresh button for file browser
+    NSButton* refreshButton = [[NSButton alloc] initWithFrame:NSMakeRect(170, splitFrame.size.height - 26, 24, 22)];
+    if (@available(macOS 11.0, *)) {
+        NSImage* refreshIcon = [NSImage imageWithSystemSymbolName:@"arrow.clockwise" accessibilityDescription:@"Refresh"];
+        if (refreshIcon) {
+            [refreshIcon setSize:NSMakeSize(12, 12)];
+            [refreshButton setImage:refreshIcon];
+        } else {
+            [refreshButton setTitle:@"↻"];
+        }
+    } else {
+        [refreshButton setTitle:@"↻"];
+    }
+    [refreshButton setBezelStyle:NSBezelStyleTexturedRounded];
+    [refreshButton setBordered:YES];
+    [refreshButton setTarget:self];
+    [refreshButton setAction:@selector(refreshFileBrowser)];
+    [refreshButton setToolTip:@"Refresh file list"];
+    refreshButton.autoresizingMask = NSViewMinYMargin | NSViewMinXMargin;
+    [fileBrowserContainer addSubview:refreshButton];
+    
     // Create file browser outline view
     _fileScrollView = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 200, splitFrame.size.height - 30)] retain];
     [_fileScrollView setHasVerticalScroller:YES];
@@ -1418,14 +1439,15 @@ extern "C" void showSettingsWindow();
     contentBackground.state = NSVisualEffectStateActive;
     [_scrollView addSubview:contentBackground positioned:NSWindowBelow relativeTo:nil];
     
-    // Add views to split view (3 columns: File Browser | TOC | Content)
+    // Add views to split view (3 columns: File Browser | Content | TOC)
+    // CORRECT ORDER: Navigation (left) → Content (center) → Structure (right)
     [_splitView addSubview:fileBrowserContainer];
-    [_splitView addSubview:tocContainer];
-    [_splitView addSubview:_scrollView];
+    [_splitView addSubview:_scrollView];  // Content in the middle
+    [_splitView addSubview:tocContainer];  // TOC on the right
     
     // Set initial split positions (hide both sidebars initially)
     [_splitView setPosition:0 ofDividerAtIndex:0];  // Hide file browser
-    [_splitView setPosition:0 ofDividerAtIndex:1];  // Hide TOC
+    [_splitView setPosition:frame.size.width ofDividerAtIndex:1];  // Hide TOC (push to right edge)
     
     [view addSubview:_splitView];
     
@@ -2632,6 +2654,14 @@ extern "C" void showSettingsWindow();
             [nc addObserver:self selector:@selector(toggleTOCSidebar) name:@"ToggleTOC" object:nil];
         }
         
+        if ([self respondsToSelector:@selector(toggleFileBrowser)]) {
+            [nc addObserver:self selector:@selector(toggleFileBrowser) name:@"ToggleFiles" object:nil];
+        }
+        
+        if ([self respondsToSelector:@selector(refreshFileBrowser)]) {
+            [nc addObserver:self selector:@selector(refreshFileBrowser) name:@"RefreshFiles" object:nil];
+        }
+        
         if ([self respondsToSelector:@selector(showSearchBar)]) {
             [nc addObserver:self selector:@selector(showSearchBar) name:@"ShowSearch" object:nil];
         }
@@ -2919,49 +2949,40 @@ extern "C" void showSettingsWindow();
 }
 
 - (void)toggleTOCSidebar {
-    // TOC is the second subview (index 1)
+    // TOC is now the THIRD subview (index 2) on the RIGHT
     NSArray* subviews = [_splitView subviews];
     if ([subviews count] < 3) return;
     
-    NSView* fileBrowserContainer = [subviews objectAtIndex:0];
-    NSView* tocContainer = [subviews objectAtIndex:1];
-    CGFloat fileBrowserWidth = NSWidth([fileBrowserContainer frame]);
+    NSView* tocContainer = [subviews objectAtIndex:2];  // TOC is now on right
+    CGFloat totalWidth = NSWidth([_splitView frame]);
     CGFloat tocWidth = NSWidth([tocContainer frame]);
     
     if (tocWidth < 10) {
-        // TOC is hidden - show it
-        // If file browser is visible, position after it, otherwise at position 0
-        CGFloat newPosition = (fileBrowserWidth > 10) ? fileBrowserWidth + 200 : 200;
+        // TOC is hidden - show it on the right
+        CGFloat newPosition = totalWidth - 250;  // 250px from right edge
         [_splitView setPosition:newPosition ofDividerAtIndex:1];
         
         // Build/refresh TOC
         [self buildTOCFromDocument];
-        NSLog(@"Showing TOC sidebar (position: %f)", newPosition);
+        NSLog(@"Showing TOC sidebar on right (position: %f)", newPosition);
     } else {
-        // TOC is visible - hide it
-        [_splitView setPosition:fileBrowserWidth ofDividerAtIndex:1];
+        // TOC is visible - hide it by pushing to right edge
+        [_splitView setPosition:totalWidth ofDividerAtIndex:1];
         NSLog(@"Hiding TOC sidebar");
     }
 }
 
 - (void)toggleFileBrowser {
-    // File browser is the first subview (index 0)
+    // File browser is still the first subview (index 0) on the LEFT
     NSArray* subviews = [_splitView subviews];
     if ([subviews count] < 3) return;
     
     NSView* fileBrowserContainer = [subviews objectAtIndex:0];
-    NSView* tocContainer = [subviews objectAtIndex:1];
     CGFloat fileBrowserWidth = NSWidth([fileBrowserContainer frame]);
-    CGFloat tocWidth = NSWidth([tocContainer frame]);
     
     if (fileBrowserWidth < 10) {
-        // File browser is hidden - show it
+        // File browser is hidden - show it INDEPENDENTLY
         [_splitView setPosition:200 ofDividerAtIndex:0];
-        
-        // If TOC is visible, we need to adjust its position too
-        if (tocWidth > 10) {
-            [_splitView setPosition:400 ofDividerAtIndex:1];  // 200 for file browser + 200 for TOC
-        }
         
         NSLog(@"Showing file browser sidebar");
         
@@ -2973,16 +2994,49 @@ extern "C" void showSettingsWindow();
                 NSLog(@"Opening folder from current file path: %@", folderPath);
             }
         }
+        
+        // Start watching for file system changes
+        [self startWatchingFolder];
     } else {
         // File browser is visible - hide it
         [_splitView setPosition:0 ofDividerAtIndex:0];
         
-        // If TOC is visible, adjust its position
-        if (tocWidth > 10) {
-            [_splitView setPosition:200 ofDividerAtIndex:1];  // Move TOC to the left
-        }
-        
         NSLog(@"Hiding file browser sidebar");
+        
+        // Stop watching when hidden
+        [self stopWatchingFolder];
+    }
+}
+
+- (void)startWatchingFolder {
+    // TODO: Implement FSEvents watching for live updates
+    NSLog(@"Would start FSEvents watching here");
+}
+
+- (void)stopWatchingFolder {
+    // TODO: Stop FSEvents watching
+    NSLog(@"Would stop FSEvents watching here");
+}
+
+- (void)refreshFileBrowser {
+    // Manual refresh for file browser with visual feedback
+    if (_currentFolderPath) {
+        // Briefly dim the outline view to show refresh is happening
+        [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
+            context.duration = 0.1;
+            _fileOutlineView.animator.alphaValue = 0.5;
+        } completionHandler:^{
+            // Rebuild the file tree
+            [self buildFileTreeFromFolder:_currentFolderPath];
+            
+            // Restore opacity
+            [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
+                context.duration = 0.1;
+                _fileOutlineView.animator.alphaValue = 1.0;
+            } completionHandler:nil];
+            
+            NSLog(@"Refreshed file browser for: %@", _currentFolderPath);
+        }];
     }
 }
 
