@@ -241,7 +241,7 @@ extern "C" void showSettingsWindow();
 + (void)registerAllBuiltInEffects;
 @end
 
-@interface MarkdownViewController : NSViewController <NSDraggingDestination, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate, NSTextViewDelegate, CommandPaletteDelegate>
+@interface MarkdownViewController : NSViewController <NSDraggingDestination, NSOutlineViewDataSource, NSOutlineViewDelegate, NSTextFieldDelegate, NSTextViewDelegate, CommandPaletteDelegate>
 - (void)saveScrollPosition;
 - (void)restoreScrollPosition;
 - (void)showCommandPalette;
@@ -1062,7 +1062,7 @@ extern "C" void showSettingsWindow();
     CGFloat _baseFontSize;
     // Search UI
     NSView* _searchBar;
-    NSSearchField* _searchField;
+    NSTextField* _searchField;  // Changed from NSSearchField for better control
     NSButton* _nextButton;
     NSButton* _previousButton;
     NSTextField* _searchResultLabel;
@@ -1200,21 +1200,25 @@ extern "C" void showSettingsWindow();
     _searchBar.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     [_searchBar setHidden:YES];
     
-    // Search field with proper text visibility
-    _searchField = [[NSSearchField alloc] initWithFrame:NSMakeRect(10, 6, 250, 24)];
+    // Search field - use NSTextField instead of NSSearchField for better control
+    _searchField = [[NSTextField alloc] initWithFrame:NSMakeRect(10, 6, 250, 24)];
     [_searchField setPlaceholderString:@"Search"];
     [_searchField setDelegate:self];
     [_searchField setTarget:self];
     [_searchField setAction:@selector(searchFieldDidChange:)];
+    [_searchField setContinuous:YES]; // Send action on each keystroke
     [_searchField setFocusRingType:NSFocusRingTypeDefault];
     [_searchField setBordered:YES];
     [_searchField setBezeled:YES];
     [_searchField setBezelStyle:NSTextFieldRoundedBezel];
     [_searchField setDrawsBackground:YES];
-    [_searchField setBackgroundColor:[NSColor textBackgroundColor]];
-    [_searchField setTextColor:[NSColor textColor]];
+    [_searchField setBackgroundColor:[NSColor whiteColor]];
+    [_searchField setTextColor:[NSColor blackColor]];
     [_searchField setFont:[NSFont systemFontOfSize:13]];
-    [[_searchField cell] setControlSize:NSControlSizeRegular];
+    [_searchField setEditable:YES];
+    [_searchField setSelectable:YES];
+    [[_searchField cell] setUsesSingleLineMode:YES];
+    [[_searchField cell] setScrollable:YES];
     [_searchBar addSubview:_searchField];
     
     // Previous button with better positioning
@@ -2204,6 +2208,20 @@ extern "C" void showSettingsWindow();
 
 // MARK: - Search Implementation
 
+- (void)controlTextDidChange:(NSNotification*)notification {
+    // Handle text changes in the search field
+    if ([notification object] == _searchField) {
+        NSString* currentText = [_searchField stringValue];
+        NSLog(@"Control text changed: '%@'", currentText);
+        
+        // Force the field to redraw
+        [_searchField setNeedsDisplay:YES];
+        
+        // Call our search handler
+        [self searchFieldDidChange:_searchField];
+    }
+}
+
 - (void)controlTextDidEndEditing:(NSNotification*)notification {
     // Handle search field losing focus - don't crash
     if ([notification object] == _searchField) {
@@ -2219,21 +2237,21 @@ extern "C" void showSettingsWindow();
     _searchBar.alphaValue = 0;
     _searchBar.hidden = NO;
     
-    // Update search field appearance for current theme
+    // Force search field to be visible with high contrast colors
+    [_searchField setBackgroundColor:[NSColor whiteColor]];
+    [_searchField setTextColor:[NSColor blackColor]];
+    [_searchField setDrawsBackground:YES];
+    [_searchField setNeedsDisplay:YES];
+    
+    // Update search bar background for current theme
     if (@available(macOS 10.14, *)) {
         NSAppearance* appearance = [NSApp effectiveAppearance];
         if ([appearance.name containsString:@"Dark"]) {
-            [_searchField setBackgroundColor:[NSColor colorWithWhite:0.2 alpha:1.0]];
-            [_searchField setTextColor:[NSColor whiteColor]];
             _searchBar.layer.backgroundColor = [[NSColor colorWithWhite:0.15 alpha:0.98] CGColor];
+            // Even in dark mode, keep search field white for visibility
         } else {
-            [_searchField setBackgroundColor:[NSColor whiteColor]];
-            [_searchField setTextColor:[NSColor blackColor]];
             _searchBar.layer.backgroundColor = [[NSColor colorWithWhite:0.97 alpha:0.98] CGColor];
         }
-    } else {
-        [_searchField setBackgroundColor:[NSColor whiteColor]];
-        [_searchField setTextColor:[NSColor blackColor]];
     }
     
     CABasicAnimation* slideDown = [CABasicAnimation animationWithKeyPath:@"position.y"];
