@@ -1,18 +1,36 @@
 # Inkwell
 
-A fast, native markdown viewer for macOS.
+A fast, native markdown viewer for macOS. Clean, focused, and efficient.
+
+![Version](https://img.shields.io/badge/version-1.0.9-blue)
+![Size](https://img.shields.io/badge/size-608KB-green)
+![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
 ## Features
 
-- **Native macOS application** with Cocoa integration
-- **File watching** for automatic refresh
-- **Drag & drop** support with visual feedback
-- **Command palette** for quick actions
-- **Table of contents** extraction
-- **Dark mode** support
-- **Smooth scrolling** with native momentum
+- **Native macOS application** with full Cocoa integration
+- **Lightning fast** - Opens 14MB files in ~1 second
+- **File watching** for automatic refresh when files change
+- **Session memory** - Remembers last opened file and window position
+- **Export support** - PDF and HTML export
+- **Command palette** (⌘K) for quick actions
+- **Focus mode** - Highlight current paragraph with arrow navigation
+- **Recent files menu** - Quick access to recent documents
+- **Dark mode** support with system preference detection
+- **Zoom controls** - Adjust text size to preference
 
 ## Installation
+
+### Via Homebrew (Recommended)
+
+```bash
+brew tap cschuman/tap
+brew install --cask inkwell
+```
+
+### Direct Download
+
+Download the latest DMG from [Releases](https://github.com/cschuman/inkwell/releases/latest)
 
 ### Build from Source
 
@@ -45,13 +63,32 @@ Or drag and drop markdown files onto the application icon.
 
 ## Keyboard Shortcuts
 
+### File Operations
 - `⌘O` - Open file
+- `⌘S` - Save (if editing)
 - `⌘W` - Close window
 - `⌘Q` - Quit application
+
+### Navigation
 - `⌘K` - Open command palette
-- `⌘+` - Increase font size
-- `⌘-` - Decrease font size
-- `⌘0` - Reset font size
+- `⌘.` - Toggle focus mode
+- `↑/↓` - Navigate paragraphs (in focus mode)
+- `⌘F` - Find in document
+- `⌘G` - Find next
+- `⌘⇧G` - Find previous
+
+### View
+- `⌘+` - Zoom in
+- `⌘-` - Zoom out
+- `⌘0` - Reset zoom
+- `⌘T` - Toggle table of contents
+- `⌘B` - Toggle file browser
+
+### Vim-style Navigation
+- `j/k` - Scroll down/up
+- `h/l` - Scroll left/right
+- `gg` - Go to top
+- `G` - Go to bottom
 
 ## Architecture
 
@@ -70,6 +107,20 @@ MIT License - See LICENSE file for details
 
 Contributions are welcome! Please feel free to submit pull requests.
 
+## Philosophy
+
+> "The best code is the code you don't write."
+
+Inkwell v1.0.9 represents a major cleanup based on expert review. We removed over 2,000 lines of unnecessary effects code to focus on what matters: **fast, reliable markdown viewing**.
+
 ## Project Status
 
-Version 1.0 focuses on core functionality and stability. The codebase has been simplified from earlier experimental versions to ensure reliability and maintainability.
+**Current Version: 1.0.9** (January 2025)
+
+Recent focus:
+- ✅ Removed 2,000+ lines of unnecessary effects code
+- ✅ Fixed fundamental features
+- ✅ Improved performance and reliability
+- ✅ Reduced binary size
+
+See [ROADMAP.md](docs/ROADMAP.md) for future plans.

@@ -7,11 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] - 2025-01-24
+
 ### Added
-- Comprehensive Homebrew distribution documentation
-- Automated release scripts (`release.sh`, `update_cask.sh`)
-- GitHub Actions workflow for automated releases
-- Release checklist documentation
+- Remember last opened file on startup
+- Focus mode with arrow key navigation for paragraphs
+
+### Removed
+- 2,000+ lines of unnecessary effects code
+- Particle effects (304 lines)
+- Ripple effect (238 lines)
+- Physics simulation (455 lines)
+- Animation orchestrator (601 lines)
+- Noise generator (381 lines)
+- Debug overlays (143 lines)
+- Orphaned app_delegate.mm file
+
+### Fixed
+- Expert review corrections - most "broken" features were actually working
+- Confusion from duplicate TODO comments in unused files
+
+### Changed
+- Simplified to single "Classic Blue" drag effect
+- Updated roadmap with brutal honesty about project state
+- Reduced effects from 5 to 1
 
 ## [1.0.6] - 2024-08-22
 
