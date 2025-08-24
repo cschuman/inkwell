@@ -4,28 +4,65 @@
 Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, focusing on performance, simplicity, and seamless integration with the macOS ecosystem.
 
 ## Development Principles
-- **Performance First** - Every feature must maintain 60+ fps scrolling
+- **Fix Before Feature** - Complete existing features before adding new ones
+- **Performance First** - Every feature must maintain 120fps scrolling
+- **Code Reduction** - Less code means fewer bugs and better performance
+- **User Trust** - Menu items must work or be removed
 - **Native Experience** - Follow macOS design guidelines and conventions
-- **Incremental Delivery** - Ship small, working improvements frequently
-- **User-Driven** - Prioritize based on actual user needs and feedback
 
 ---
 
-## Phase 1: Foundation Stabilization ✅ COMPLETED (v1.0.0 - v1.0.2)
-**Theme: "Rock Solid Basics"**
+## Phase 0: Fix Fundamentals 🔴 URGENT (v1.0.9)
+**Timeline: 1 week**
+**Theme: "Stop Lying to Users"**
 
-### Achieved
+### Critical Fixes (Not Actually Implemented)
+- [ ] **Export to PDF** - Menu item exists but does nothing (30 min)
+- [ ] **Export to HTML** - Menu item exists but does nothing (30 min)
+- [ ] **Zoom controls** - Menu items exist but do nothing (1 hour)
+- [ ] **Window persistence** - Claimed working but broken (2 hours)
+- [ ] **Recent files menu** - Standard macOS feature missing (1 hour)
+- [ ] **Remember last file** - Basic expectation not met (30 min)
+
+### Code Cleanup (5,000+ lines to delete)
+- [ ] Remove ALL drag effects except one simple one
+- [ ] Delete particle effects, physics simulation, noise generators
+- [ ] Remove non-functional performance monitoring
+- [ ] Remove debug overlays
+- [ ] Consolidate main.mm (4,000 → 2,000 lines)
+
+### Performance Fixes
+- [ ] Test with 10MB markdown file (currently freezes)
+- [ ] Implement basic progressive rendering for large files
+- [ ] Add file size warnings for files > 10MB
+
+### Success Metrics
+- All menu items either work or are removed
+- 10MB file loads without freezing
+- Binary size < 600KB after cleanup
+- Zero TODO comments in menu handlers
+
+---
+
+## Phase 1: Foundation Stabilization ⚠️ PARTIALLY COMPLETE (v1.0.0 - v1.0.8)
+**Theme: "Actually Working Basics"**
+
+### Actually Achieved
 - ✅ Fixed critical dylib issue preventing app launch
 - ✅ TOC click navigation working
 - ✅ File watching auto-refresh functional
-- ✅ All keyboard shortcuts documented and working
-- ✅ Drag & drop fully implemented with visual effects
+- ✅ Drag & drop fully implemented (with excessive effects)
 - ✅ Command palette (Cmd+K) working
-- ✅ Search functionality (Cmd+F) with highlighting
-- ✅ Export to PDF/HTML working
-- ✅ Zoom controls implemented
-- ✅ Window persistence working
+- ✅ Basic search functionality (Cmd+F)
 - ✅ Command-line file opening (`inkwell file.md`)
+- ✅ Custom app icon
+- ✅ Homebrew distribution
+
+### Falsely Claimed as Complete
+- ❌ Export to PDF/HTML (just TODO comments)
+- ❌ Zoom controls (just TODO comments)
+- ❌ Window persistence (broken)
+- ❌ Performance for large files (freezes)
 
 ### Outstanding Items
 - [ ] Re-enable test suite (currently disabled)
@@ -34,222 +71,203 @@ Inkwell aims to be the fastest, most elegant native Markdown viewer for macOS, f
 
 ---
 
-## Phase 2: Essential Enhancements (Current - v1.1.0)
-**Timeline: 2-3 weeks**
-**Theme: "Daily Driver Ready"**
+## Phase 2: Core User Experience (v1.1.0)
+**Timeline: 2 weeks**
+**Theme: "Reading Experience First"**
 
-### Goals
-- Add most-requested quality-of-life features
-- Improve document navigation experience
-- Polish existing features
+### Must Have (Week 1)
+- [ ] **Real search** - Find with highlighting, navigate between results
+- [ ] **Reading progress bar** - Subtle indicator of position in document
+- [ ] **Reading time estimate** - "~5 min read" in status bar
+- [ ] **Session restoration** - Remember file + scroll position
+- [ ] **Welcome document** - First-launch experience with sample
+- [ ] **Working recent files** - In File menu and dock
 
-### Deliverables
-- [ ] CLI folder support - `inkwell .` opens folder browser
-- [ ] Tab support for multiple documents
-- [ ] Dark mode with system preference detection (partial support exists)
-- [ ] Back/forward navigation history
-- [ ] Search highlighting persistence across document changes
-- [ ] TOC with collapsible sections
-- [ ] Recent files in dock menu (basic support exists)
-- [ ] Preference pane for customization
-- [ ] Re-enable and update test suite
-- [ ] Code signing for easier distribution
+### Nice to Have (Week 2)
+- [ ] **CLI folder support** - `inkwell .` opens folder browser
+- [ ] **Focus mode that works** - Dim everything except current paragraph
+- [ ] **Auto-TOC** - Fixed position, collapsible sidebar
+- [ ] **Smooth momentum scrolling** - Perfect 120fps always
+- [ ] **Document stats** - Word count, character count in status bar
+
+### Explicitly Deprioritized
+- ❌ Tab support (adds complexity, wait for user demand)
+- ❌ Preference pane (keep it simple for now)
+- ❌ Back/forward navigation (not essential for v1.1)
 
 ### Success Metrics
-- Can replace Preview.app for daily markdown viewing
-- Positive feedback on navigation improvements
-- <100ms file open time for typical documents
+- Search works as well as VS Code
+- Reading experience rivals iA Writer
+- Zero performance degradation
+- <50ms file open time
 
 ---
 
-## Phase 3: Power User Features (v1.2.0)
-**Timeline: 3-4 weeks**
-**Theme: "Professional Tool"**
+## Phase 3: Performance at Scale (v1.2.0)
+**Timeline: 3 weeks**
+**Theme: "Handle Anything"**
 
-### Goals
-- Support advanced markdown features
-- Enhance export capabilities
-- Add power user shortcuts
+### Core Performance (Week 1-2)
+- [ ] **Virtual scrolling** - Only render visible portion
+- [ ] **Progressive rendering** - Show content while parsing
+- [ ] **Incremental parsing** - Parse only changed sections
+- [ ] **Memory optimization** - Stream large files, don't load entirely
+- [ ] **Background processing** - Parse on background thread
 
-### Deliverables
-- [ ] Mermaid diagram rendering
-- [ ] Math formula support (LaTeX/KaTeX)
-- [ ] Export to DOCX and enhanced PDF
-- [ ] Custom CSS theme support
-- [ ] Global search across multiple files
-- [ ] External editor integration
-- [ ] Bookmark system
+### Large File Support (Week 3)
+- [ ] **10MB file support** - Currently freezes, must work smoothly
+- [ ] **100MB file support** - Open in <2 seconds
+- [ ] **Smart chunking** - Break large documents into segments
+- [ ] **File size warnings** - Alert user before opening huge files
+- [ ] **Cancel/abort loading** - Let user cancel if taking too long
+
+### Already Have (Don't Rewrite)
+- ✅ Metal shaders written (just not integrated)
+- ✅ SIMD available (just not used)
+- ❌ Don't write more GPU code until current code is used
 
 ### Success Metrics
-- Feature parity with major markdown editors (viewing only)
-- Support for technical documentation workflows
-- Adoption by developers and technical writers
+- 100MB file opens in <2 seconds
+- 10MB file scrolls at 120fps
+- Memory usage <100MB for any file size
+- No freezing, ever
 
 ---
 
-## Phase 4: Performance Revolution (v1.3.0)
-**Timeline: 4-5 weeks**
-**Theme: "Blazing Fast"**
+## Phase 4: Advanced Features (v1.3.0) 
+**Timeline: 4 weeks**
+**Theme: "Power Tools"**
 
-### Goals
-- Optimize for massive documents (100MB+)
-- Implement true GPU acceleration
-- Achieve best-in-class performance
+### Developer Features (Week 1-2)
+- [ ] **Mermaid diagrams** - Already partially implemented
+- [ ] **Math formulas** - LaTeX/KaTeX support
+- [ ] **Code block enhancements** - Line numbers, better highlighting
+- [ ] **Global search** - Search across folder of files
+- [ ] **External editor** - "Open in VS Code" menu item
 
-### Deliverables
-- [ ] Incremental parsing for large files
-- [ ] Virtual scrolling implementation
-- [ ] GPU-accelerated text rendering (Metal)
-- [ ] Memory pool optimization
-- [ ] Background parsing with progressive rendering
-- [ ] SIMD optimizations for text processing
+### Export & Publishing (Week 3-4)
+- [ ] **Better PDF export** - With proper pagination
+- [ ] **DOCX export** - For Word users
+- [ ] **HTML export with styles** - Ready-to-publish HTML
+- [ ] **Custom CSS themes** - User-defined styles
+- [ ] **Print preview** - WYSIWYG printing
 
 ### Success Metrics
-- Open 100MB file in <1 second
-- Maintain 120fps scrolling on all documents
-- <50MB memory usage for typical documents
-- Handle 1M+ line documents smoothly
+- Can handle technical documentation
+- Export quality matches Pandoc
+- Developers choose Inkwell for docs
 
 ---
 
-## Phase 5: Ecosystem Integration (v1.4.0)
-**Timeline: 4-5 weeks**
-**Theme: "Part of Your Workflow"**
+## Phase 5: Polish & Ship (v2.0.0)
+**Timeline: 2 weeks**
+**Theme: "Ready for the World"**
 
-### Goals
-- Deep macOS integration
-- Developer tool integration
-- Extensibility foundation
+### Mac App Store Preparation
+- [ ] **Code signing** - Proper Apple Developer ID
+- [ ] **Sandboxing** - App Store compliance
+- [ ] **Help documentation** - Built-in help system
+- [ ] **App Store assets** - Screenshots, description, keywords
+- [ ] **Telemetry-free analytics** - Respect privacy
 
-### Deliverables
-- [ ] Quick Look plugin enhancement
-- [ ] Spotlight search integration
-- [ ] Share sheet support
-- [ ] AppleScript support
-- [ ] Basic plugin system
-- [ ] CLI tool improvements
-- [ ] Integration with note-taking apps
+### Professional Polish
+- [ ] **Proper app icon** - Shows in dock correctly
+- [ ] **Onboarding flow** - First-launch experience
+- [ ] **Keyboard shortcuts help** - Discoverable shortcuts
+- [ ] **Sample documents** - Beautiful examples included
+- [ ] **Error handling** - Graceful failures with helpful messages
 
 ### Success Metrics
-- Seamless integration with macOS workflows
-- Plugin ecosystem beginning to form
-- Adoption by app developers for documentation
+- Mac App Store approval
+- 5-star average rating
+- <1% crash rate
+- 1000+ downloads in first month
 
 ---
 
-## Phase 6: Intelligence Layer (v2.0.0)
-**Timeline: 6-8 weeks**
-**Theme: "Smart Viewer"**
+## Future Considerations (Post v2.0)
 
-### Goals
-- Add intelligent features
-- Major version milestone
-- Professional polish
+### Only If Users Demand It
+- Tab support for multiple documents
+- Plugin system for extensions
+- Collaboration features
+- Cloud sync
+- Mobile companion app
 
-### Deliverables
-- [ ] Smart search with context understanding
-- [ ] Document summarization
-- [ ] Auto-generated table of contents
-- [ ] Reading time estimates
-- [ ] Document statistics and insights
-- [ ] Link validation and checking
-- [ ] Professional documentation
-
-### Success Metrics
-- Mac App Store release
-- 1000+ GitHub stars
-- Active user community
-- Plugin ecosystem started
+### Probably Never
+- Editing capabilities (stay focused on viewing)
+- AI features (keep it simple and fast)
+- Subscription model (one-time purchase if anything)
+- Electron rewrite (stay native)
 
 ---
 
-## Long-term Vision (Post v2.0)
+## Code Quality Principles
 
-### Potential Directions
-1. **Inkwell Pro** - Advanced features for professionals
-2. **Inkwell Teams** - Collaboration features
-3. **Inkwell Cloud** - Sync and backup service
-4. **Inkwell Mobile** - iOS/iPadOS companion app
-5. **Inkwell Editor** - Full markdown editing capabilities
-
-### Exploration Areas
-- AI-powered features (formatting, completion, translation)
-- Real-time collaboration
-- Version control integration
-- Custom markdown extensions
-- Publishing platform integration
+### The 10 Commandments
+1. **Thou shalt not ship broken menu items**
+2. **Thou shalt delete unused code**
+3. **Thou shalt test with 10MB files**
+4. **Thou shalt maintain 120fps always**
+5. **Thou shalt keep binary under 1MB**
+6. **Thou shalt implement before announcing**
+7. **Thou shalt not add effects for markdown**
+8. **Thou shalt respect user expectations**
+9. **Thou shalt profile before optimizing**
+10. **Thou shalt choose boring technology**
 
 ---
 
 ## Release Strategy
 
 ### Version Numbering
-- **Major (x.0.0)** - Significant feature additions or architectural changes
-- **Minor (0.x.0)** - New features and enhancements
-- **Patch (0.0.x)** - Bug fixes and minor improvements
+- **Major (x.0.0)** - Significant user-facing improvements
+- **Minor (0.x.0)** - New features that work
+- **Patch (0.0.x)** - Bug fixes and performance
 
 ### Release Cadence
-- **Patch releases** - As needed for critical fixes
-- **Minor releases** - Every 3-4 weeks
-- **Major releases** - Every 3-4 months
+- **Phase 0** - Ship v1.0.9 within 1 week
+- **Then** - Release when ready, not on schedule
+- **No deadlines** - Quality over dates
 
 ### Distribution Channels
-1. Direct download from website
-2. Homebrew cask
-3. Mac App Store (after v2.0)
-4. GitHub releases
-
----
-
-## Community Engagement
-
-### Feedback Channels
-- GitHub Issues for bug reports
-- GitHub Discussions for feature requests
-- Twitter/X for announcements
-- Discord for community chat (future)
-
-### Open Source Strategy
-- Maintain transparency with public roadmap
-- Accept community contributions
-- Regular development updates
-- Beta testing program
-
----
-
-## Risk Mitigation
-
-### Technical Risks
-- **Performance degradation** - Continuous benchmarking
-- **Platform changes** - Stay current with macOS betas
-- **Dependency issues** - Minimal external dependencies
-
-### Market Risks
-- **Competition** - Focus on native performance advantage
-- **User adoption** - Free tier with optional pro features
-- **Sustainability** - Multiple revenue streams planned
+1. GitHub releases (primary)
+2. Homebrew cask (current)
+3. Direct download (future)
+4. Mac App Store (v2.0)
 
 ---
 
 ## Success Metrics
 
-### Key Performance Indicators
-- GitHub stars and forks
-- Download numbers
-- User retention (telemetry-free estimation)
-- Performance benchmarks vs competitors
-- Community engagement levels
-- App Store ratings (post-launch)
+### What Actually Matters
+- **It works** - All features function as advertised
+- **It's fast** - 10MB file in <1 second
+- **It's small** - Binary under 600KB
+- **It's reliable** - Zero crashes
+- **It's honest** - No fake features
 
-### Quality Gates
-- Each release must maintain or improve performance
-- No regressions in existing features
-- Comprehensive test coverage
-- Documentation updates with each release
+### What Doesn't Matter
+- GitHub stars
+- Feature count
+- Line count (less is more)
+- Framework choices
+- Effect variety
 
 ---
 
-*This roadmap is a living document and will be updated based on user feedback, technical discoveries, and market conditions.*
+## Expert Review Quotes
+
+**Sr. Principal Engineer (25 years experience):**
+> "You have 15,000 lines of code. 5,000 are effects nobody uses. 10 are the PDF export you haven't written. Which matters more?"
+
+**Creative Director (20 years experience):**
+> "Every second spent on particle effects is a second not spent on making text beautiful and readable. You're not a game. You're a reading tool."
+
+---
+
+*This roadmap has been revised based on expert review and brutal honesty about current state.*
 
 *Last updated: January 2025*
-*Current version: v1.0.2*
+*Current version: v1.0.8 (claiming features that don't exist)*
+*Next version: v1.0.9 (will actually fix things)*

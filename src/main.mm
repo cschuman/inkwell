@@ -12,6 +12,16 @@
 #include "ui/settings_manager.h"
 #include "version.h"
 
+// Forward declaration for focus mode
+@interface MDFocusMode : NSObject
+- (instancetype)initWithTextView:(NSTextView*)textView scrollView:(NSScrollView*)scrollView;
+- (void)setEnabled:(BOOL)enabled;
+- (BOOL)isEnabled;
+- (void)moveFocusUp;
+- (void)moveFocusDown;
+- (void)moveFocusToLocation:(NSPoint)location;
+@end
+
 // Simple command palette function
 extern "C" void showSimpleCommandPalette();
 
@@ -168,9 +178,24 @@ extern "C" void showSettingsWindow();
 
 @implementation VimTextView
 
+- (void)mouseDown:(NSEvent*)event {
+    // Handle mouse click for focus mode paragraph selection
+    if (self.markdownController && [self.markdownController respondsToSelector:@selector(handleFocusModeClick:)]) {
+        [(MarkdownViewController*)self.markdownController handleFocusModeClick:event];
+    }
+    
+    [super mouseDown:event];
+}
+
 - (void)keyDown:(NSEvent*)event {
     NSString* key = event.charactersIgnoringModifiers;
     NSUInteger modifierFlags = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+    
+    // Forward arrow keys to controller for focus mode navigation
+    if ((event.keyCode == 125 || event.keyCode == 126) && modifierFlags == 0 && self.markdownController) {
+        [self.markdownController keyDown:event];
+        return;
+    }
     
     // Let the controller handle vim navigation keys when no modifiers are pressed
     if (modifierFlags == 0 && self.markdownController) {
@@ -209,7 +234,6 @@ extern "C" void showSettingsWindow();
 // Import effects system
 #import "../include/effects/effect_manager.h"
 #import "../include/effects/drag_effect_protocol.h"
-#import "effects/effect_debug_overlay.mm"
 
 // Forward declare the registry
 @interface EffectsRegistry : NSObject
@@ -650,45 +674,13 @@ extern "C" void showSettingsWindow();
     
     [effectsMenu addItem:[NSMenuItem separatorItem]];
     
-    // Individual effect items will be added dynamically
-    NSMenuItem* classicItem = [effectsMenu addItemWithTitle:@"Classic Blue" 
+    // Only one simple effect now
+    NSMenuItem* simpleItem = [effectsMenu addItemWithTitle:@"Simple Highlight" 
                                                       action:@selector(selectEffect:) 
                                                keyEquivalent:@""];
-    [classicItem setTag:0];
-    [classicItem setTarget:nil];
+    [simpleItem setTag:0];
+    [simpleItem setTarget:nil];
     
-    NSMenuItem* rippleItem = [effectsMenu addItemWithTitle:@"Ripple" 
-                                                     action:@selector(selectEffect:) 
-                                              keyEquivalent:@""];
-    [rippleItem setTag:1];
-    [rippleItem setTarget:nil];
-    
-    NSMenuItem* stardustItem = [effectsMenu addItemWithTitle:@"Stardust" 
-                                                       action:@selector(selectEffect:) 
-                                                keyEquivalent:@""];
-    [stardustItem setTag:2];
-    [stardustItem setTarget:nil];
-    
-    NSMenuItem* gravitationalItem = [effectsMenu addItemWithTitle:@"Gravitational Wake" 
-                                                           action:@selector(selectEffect:) 
-                                                    keyEquivalent:@""];
-    [gravitationalItem setTag:3];
-    [gravitationalItem setTarget:nil];
-    
-    NSMenuItem* liquidGlassItem = [effectsMenu addItemWithTitle:@"Liquid Glass" 
-                                                         action:@selector(selectEffect:) 
-                                                  keyEquivalent:@""];
-    [liquidGlassItem setTag:4];
-    [liquidGlassItem setTarget:nil];
-    
-    [effectsMenu addItem:[NSMenuItem separatorItem]];
-    
-    // Debug overlay toggle
-    NSMenuItem* debugOverlayItem = [effectsMenu addItemWithTitle:@"Show Debug Overlay" 
-                                                           action:@selector(toggleEffectDebugOverlay) 
-                                                    keyEquivalent:@"F"];
-    [debugOverlayItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
-    [debugOverlayItem setTarget:nil];
     
     // Tools menu
     NSMenuItem* toolsMenuItem = [[NSMenuItem alloc] init];
@@ -1003,6 +995,7 @@ extern "C" void showSettingsWindow();
     NSView* _topScrollIndicator;
     NSView* _bottomScrollIndicator;
     BOOL _focusModeEnabled;
+    MDFocusMode* _focusMode;  // New paragraph-based focus mode
     // NSView* _focusOverlay; // Removed - no focus overlay/vignette
     NSSplitView* _splitView;
     NSOutlineView* _tocOutlineView;
@@ -1429,11 +1422,7 @@ extern "C" void showSettingsWindow();
     
     // Reading time label removed - no longer added to view
     
-    // Add edge indicators on top
-    if (_topScrollIndicator && _bottomScrollIndicator) {
-        [view addSubview:_topScrollIndicator positioned:NSWindowAbove relativeTo:nil];
-        [view addSubview:_bottomScrollIndicator positioned:NSWindowAbove relativeTo:nil];
-    }
+    // Edge indicators disabled for cleaner interface
     
     // Initial update of scroll indicators
     [self updateScrollIndicators];
@@ -1698,6 +1687,10 @@ extern "C" void showSettingsWindow();
     // Add to recent files
     [self addToRecentFiles:path];
     
+    // Save as last opened file
+    [[NSUserDefaults standardUserDefaults] setObject:path forKey:@"LastOpenedFile"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
     NSError* error = nil;
     NSString* content = [NSString stringWithContentsOfFile:path
                                                   encoding:NSUTF8StringEncoding
@@ -1875,6 +1868,15 @@ extern "C" void showSettingsWindow();
             [vc openFolder:folderToOpen];
             [vc toggleFileBrowser];
         });
+    } else {
+        // No command-line file or folder - try to restore last opened file
+        NSString* lastOpenedFile = [[NSUserDefaults standardUserDefaults] stringForKey:@"LastOpenedFile"];
+        if (lastOpenedFile && [[NSFileManager defaultManager] fileExistsAtPath:lastOpenedFile]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                NSLog(@"Restoring last opened file: %@", lastOpenedFile);
+                [self openFile:lastOpenedFile];
+            });
+        }
     }
     
     // Update recent files menu on startup - delay to ensure menu is ready
@@ -1934,6 +1936,12 @@ extern "C" void showSettingsWindow();
     NSString* key = event.charactersIgnoringModifiers;
     NSUInteger modifierFlags = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
     
+    // Debug logging for arrow keys
+    if (event.keyCode == 125 || event.keyCode == 126) {
+        NSLog(@"MarkdownViewController Arrow key detected: keyCode=%ld, focusMode=%d, focusModeObj=%@", 
+              (long)event.keyCode, _focusModeEnabled, _focusMode);
+    }
+    
     // Check for Cmd+K
     if ([key isEqualToString:@"k"] && (modifierFlags & NSEventModifierFlagCommand)) {
         // Show command palette (Cmd+K)
@@ -1962,7 +1970,24 @@ extern "C" void showSettingsWindow();
         if (![_searchBar isHidden]) {
             [self hideSearchBar];
         }
+        // Also exit focus mode if enabled
+        if (_focusModeEnabled) {
+            [self toggleFocusMode];
+        }
         return;
+    }
+    
+    // Focus mode paragraph navigation (arrow keys when focus mode is active)
+    if (_focusModeEnabled && _focusMode && modifierFlags == 0) {
+        if (event.keyCode == 126) { // Up arrow
+            NSLog(@"Focus mode: Moving up");
+            [_focusMode moveFocusUp];
+            return;
+        } else if (event.keyCode == 125) { // Down arrow
+            NSLog(@"Focus mode: Moving down");
+            [_focusMode moveFocusDown];
+            return;
+        }
     }
     
     // Vim-style navigation (no modifiers)
@@ -3281,11 +3306,6 @@ extern "C" void showSettingsWindow();
     // Set up hotkeys for effect switching
     [self setupEffectHotkeys];
     
-    // Optionally show debug overlay (can be toggled via menu)
-    BOOL showDebug = [[NSUserDefaults standardUserDefaults] boolForKey:@"ShowEffectDebugOverlay"];
-    if (showDebug) {
-        [self showEffectDebugOverlay];
-    }
     
     NSLog(@"Effects system initialized with %lu effects", 
           (unsigned long)effectManager.availableEffects.count);
@@ -3316,13 +3336,6 @@ extern "C" void showSettingsWindow();
             return nil; // Consume the event
         }
         
-        // Cmd+Shift+F: Toggle debug overlay
-        if ([event.charactersIgnoringModifiers isEqualToString:@"F"] &&
-            (modifiers & NSEventModifierFlagCommand) &&
-            (modifiers & NSEventModifierFlagShift)) {
-            [self toggleEffectDebugOverlay];
-            return nil; // Consume the event
-        }
         
         return event; // Pass through
     }];
@@ -3372,29 +3385,6 @@ extern "C" void showSettingsWindow();
     });
 }
 
-- (void)showEffectDebugOverlay {
-    [EffectDebugOverlay attachToView:self.view];
-}
-
-- (void)toggleEffectDebugOverlay {
-    // Find existing overlay
-    EffectDebugOverlay* overlay = nil;
-    for (NSView* subview in self.view.subviews) {
-        if ([subview isKindOfClass:[EffectDebugOverlay class]]) {
-            overlay = (EffectDebugOverlay*)subview;
-            break;
-        }
-    }
-    
-    if (overlay) {
-        [overlay removeFromSuperview];
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"ShowEffectDebugOverlay"];
-    } else {
-        [self showEffectDebugOverlay];
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"ShowEffectDebugOverlay"];
-    }
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
 
 - (void)selectEffect:(NSMenuItem*)sender {
     [[EffectManager sharedManager] selectEffectAtIndex:sender.tag];
@@ -3916,37 +3906,64 @@ extern "C" void showSettingsWindow();
 // MARK: - Focus Mode
 
 - (void)setupFocusMode {
-    // Focus mode disabled - no vignette or overlay effects
-    _focusModeEnabled = NO;
+    // Initialize the new paragraph-based focus mode
+    if (_textView && _scrollView) {
+        _focusMode = [[MDFocusMode alloc] initWithTextView:_textView scrollView:_scrollView];
+        _focusModeEnabled = NO;
+        NSLog(@"Focus mode initialized successfully");
+    } else {
+        NSLog(@"WARNING: Cannot initialize focus mode - textView or scrollView is nil");
+    }
+}
+
+- (void)handleFocusModeClick:(NSEvent*)event {
+    if (!_focusModeEnabled || !_focusMode) return;
+    
+    // Convert click location to text view coordinates
+    NSPoint locationInTextView = [_textView convertPoint:event.locationInWindow fromView:nil];
+    
+    // Move focus to clicked paragraph
+    [_focusMode moveFocusToLocation:locationInTextView];
 }
 
 - (void)toggleFocusMode {
     _focusModeEnabled = !_focusModeEnabled;
     
-    // Focus mode simplified - no overlay or vignette effects
+    // Enable/disable the paragraph focus mode
+    [_focusMode setEnabled:_focusModeEnabled];
+    
+    // Animate UI changes
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
         context.duration = 0.5;
         context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
         
         if (_focusModeEnabled) {
-            // Enter focus mode - just subtle UI changes
-            _tocScrollView.animator.alphaValue = 0.3;
-            _statusLabel.animator.alphaValue = 0.3;
+            // Enter focus mode - hide/dim UI chrome
+            if (_tocScrollView) _tocScrollView.animator.alphaValue = 0.0;  // Hide completely
+            if (_fileScrollView) _fileScrollView.animator.alphaValue = 0.0;  // Hide completely
+            if (_statusLabel) _statusLabel.animator.alphaValue = 0.3;
             
-            // Hide scroll indicators temporarily
-            _topScrollIndicator.animator.alphaValue = 0.0;
-            _bottomScrollIndicator.animator.alphaValue = 0.0;
+            // Hide scroll indicators completely
+            if (_topScrollIndicator) {
+                _topScrollIndicator.animator.alphaValue = 0.0;
+                _topScrollIndicator.hidden = YES;
+            }
+            if (_bottomScrollIndicator) {
+                _bottomScrollIndicator.animator.alphaValue = 0.0;
+                _bottomScrollIndicator.hidden = YES;
+            }
             
             // Post notification for other UI updates
             [[NSNotificationCenter defaultCenter] postNotificationName:@"FocusModeEnabled" object:nil];
         } else {
-            // Exit focus mode
+            // Exit focus mode - restore UI
+            if (_tocScrollView) _tocScrollView.animator.alphaValue = 1.0;
+            if (_fileScrollView) _fileScrollView.animator.alphaValue = 1.0;
+            if (_statusLabel) _statusLabel.animator.alphaValue = 1.0;
             
-            // Restore UI elements
-            _tocScrollView.animator.alphaValue = 1.0;
-            _statusLabel.animator.alphaValue = 1.0;
-            
-            // Update scroll indicators
+            // Restore scroll indicators
+            if (_topScrollIndicator) _topScrollIndicator.hidden = NO;
+            if (_bottomScrollIndicator) _bottomScrollIndicator.hidden = NO;
             [self updateScrollIndicators];
             
             // Post notification
@@ -3955,82 +3972,40 @@ extern "C" void showSettingsWindow();
     }];
     
     // Update status
-    NSString* modeStatus = _focusModeEnabled ? @"Focus Mode: ON" : @"Focus Mode: OFF";
+    NSString* modeStatus = _focusModeEnabled ? @"Focus Mode: Paragraph Highlighting Active" : @"Focus Mode: OFF";
     NSLog(@"%@", modeStatus);
+    
+    // Update status label with mode info
+    if (_statusLabel) {
+        if (_focusModeEnabled) {
+            [_statusLabel setStringValue:@"Focus Mode • Use ↑↓ to navigate paragraphs"];
+        } else {
+            // Restore normal status
+            NSString* statusText = [NSString stringWithFormat:@"Inkwell %s (Build %d)", 
+                                    mdviewer::getVersionString(), 
+                                    mdviewer::getBuildNumber()];
+            [_statusLabel setStringValue:statusText];
+        }
+    }
 }
 
 // MARK: - Edge Scroll Indicators
 
 - (void)setupEdgeScrollIndicators {
-    if (!self.view) return;
-    NSRect frame = self.view.frame;
-    
-    // Top scroll indicator with gradient
-    _topScrollIndicator = [[NSView alloc] initWithFrame:NSMakeRect(0, frame.size.height - 80, frame.size.width, 80)];
-    _topScrollIndicator.wantsLayer = YES;
-    _topScrollIndicator.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
-    
-    // Create gradient layer for top indicator
-    CAGradientLayer* topGradient = [CAGradientLayer layer];
-    topGradient.frame = _topScrollIndicator.bounds;
-    topGradient.colors = @[
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.15].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.05].CGColor,
-        (id)[NSColor clearColor].CGColor
-    ];
-    topGradient.locations = @[@0.0, @0.5, @1.0];
-    _topScrollIndicator.layer = topGradient;
-    _topScrollIndicator.alphaValue = 0.0; // Initially hidden
-    
-    // Bottom scroll indicator with gradient  
-    _bottomScrollIndicator = [[NSView alloc] initWithFrame:NSMakeRect(0, 22, frame.size.width, 80)];
-    _bottomScrollIndicator.wantsLayer = YES;
-    _bottomScrollIndicator.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
-    
-    // Create gradient layer for bottom indicator
-    CAGradientLayer* bottomGradient = [CAGradientLayer layer];
-    bottomGradient.frame = _bottomScrollIndicator.bounds;
-    bottomGradient.colors = @[
-        (id)[NSColor clearColor].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.05].CGColor,
-        (id)[[NSColor blackColor] colorWithAlphaComponent:0.15].CGColor
-    ];
-    bottomGradient.locations = @[@0.0, @0.5, @1.0];
-    _bottomScrollIndicator.layer = bottomGradient;
-    _bottomScrollIndicator.alphaValue = 0.0; // Initially hidden
+    // Scroll indicators disabled - clean interface without gradient bars
+    _topScrollIndicator = nil;
+    _bottomScrollIndicator = nil;
 }
 
 - (void)scrollViewDidScroll:(NSNotification*)notification {
-    [self updateScrollIndicators];
+    // Don't update indicators during focus mode
+    if (!_focusModeEnabled) {
+        [self updateScrollIndicators];
+    }
 }
 
 - (void)updateScrollIndicators {
-    if (!_scrollView || !_textView) return;
-    
-    NSRect visibleRect = [_scrollView documentVisibleRect];
-    NSRect documentRect = [[_scrollView documentView] frame];
-    
-    // Calculate scroll position
-    CGFloat scrollTop = visibleRect.origin.y;
-    CGFloat scrollBottom = NSMaxY(visibleRect);
-    CGFloat documentHeight = documentRect.size.height;
-    
-    // Top indicator - show when not at top
-    BOOL canScrollUp = scrollTop > 0;
-    CGFloat topAlpha = canScrollUp ? MIN(scrollTop / 100.0, 1.0) : 0.0;
-    
-    // Bottom indicator - show when not at bottom
-    BOOL canScrollDown = scrollBottom < documentHeight;
-    CGFloat bottomAlpha = canScrollDown ? MIN((documentHeight - scrollBottom) / 100.0, 1.0) : 0.0;
-    
-    // Animate the alpha changes
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext* context) {
-        context.duration = 0.2;
-        context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-        
-        _topScrollIndicator.animator.alphaValue = topAlpha;
-        _bottomScrollIndicator.animator.alphaValue = bottomAlpha;
-    }];
+    // Scroll indicators disabled - nothing to update
 }
 
 // MARK: - Performance and Status Management

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Inkwell VERSION 1.0.8 LANGUAGES CXX OBJCXX)
+project(Inkwell VERSION 1.0.9 LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -102,16 +102,12 @@ add_executable(Inkwell
     src/platform/macos/main_window.mm
     src/platform/macos/settings_window.mm
     src/ui/command_palette.mm
+    src/ui/focus_mode.mm
     src/effects/base_drag_effect.mm
     src/effects/effect_manager.mm
     src/effects/no_effect.mm
-    src/effects/ripple_effect.mm
-    src/effects/particle_effect.mm
     src/effects/effects_registry.mm
     src/effects/pass_through_view.mm
-    src/effects/physics_world.mm
-    src/effects/animation_orchestrator.mm
-    src/effects/noise_generator.mm
     resources/Info.plist
 )
 
