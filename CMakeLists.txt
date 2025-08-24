@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Inkwell VERSION 1.0.9 LANGUAGES CXX OBJCXX)
+project(Inkwell VERSION 1.1.0 LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -126,7 +126,7 @@ set_target_properties(Inkwell PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.coreymd.inkwell"
     MACOSX_BUNDLE_ICON_FILE "Inkwell"
-    RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/resources/Inkwell.icns"
+    RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/resources/Inkwell.icns;${CMAKE_CURRENT_SOURCE_DIR}/resources/welcome.md"
 )
 
 

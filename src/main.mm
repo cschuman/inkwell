@@ -37,6 +37,7 @@ extern "C" void showSettingsWindow();
 - (void)showCommandPalette:(id)sender;
 - (void)saveWindowFrame;
 - (void)restoreWindowFrame;
+- (NSMenu*)applicationDockMenu:(NSApplication*)sender;
 @end
 
 @interface TOCItem : NSObject
@@ -241,6 +242,9 @@ extern "C" void showSettingsWindow();
 @end
 
 @interface MarkdownViewController : NSViewController <NSDraggingDestination, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate, NSTextViewDelegate, CommandPaletteDelegate>
+- (void)saveScrollPosition;
+- (void)restoreScrollPosition;
+- (void)showCommandPalette;
 - (void)applySyntaxHighlighting;
 - (void)openFile:(NSString*)path;
 - (void)openFolder:(NSString*)folderPath;
@@ -982,6 +986,50 @@ extern "C" void showSettingsWindow();
 
 - (void)windowWillClose:(NSNotification*)notification {
     [self saveWindowFrame];
+    // Save scroll position through the view controller
+    MarkdownViewController* vc = (MarkdownViewController*)_mainViewController;
+    if ([vc respondsToSelector:@selector(saveScrollPosition)]) {
+        [vc saveScrollPosition];
+    }
+}
+
+- (NSMenu*)applicationDockMenu:(NSApplication*)sender {
+    NSMenu* dockMenu = [[NSMenu alloc] init];
+    
+    // Add recent files to dock menu
+    NSArray* recentFiles = [[NSUserDefaults standardUserDefaults] arrayForKey:@"RecentFiles"];
+    if ([recentFiles count] > 0) {
+        for (NSString* path in recentFiles) {
+            NSMenuItem* item = [[NSMenuItem alloc] initWithTitle:[path lastPathComponent]
+                                                          action:@selector(openRecentFileFromDock:)
+                                                   keyEquivalent:@""];
+            [item setRepresentedObject:path];
+            [item setTarget:self];
+            [dockMenu addItem:item];
+            [item release];
+        }
+        
+        [dockMenu addItem:[NSMenuItem separatorItem]];
+    }
+    
+    // Add command palette option
+    NSMenuItem* cmdPaletteItem = [[NSMenuItem alloc] initWithTitle:@"Command Palette"
+                                                             action:@selector(showCommandPalette:)
+                                                      keyEquivalent:@""];
+    [cmdPaletteItem setTarget:self];
+    [dockMenu addItem:cmdPaletteItem];
+    [cmdPaletteItem release];
+    
+    return [dockMenu autorelease];
+}
+
+- (void)openRecentFileFromDock:(id)sender {
+    NSString* path = [sender representedObject];
+    if (path && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        MarkdownViewController* vc = (MarkdownViewController*)_mainViewController;
+        [vc openFile:path];
+        [_window makeKeyAndOrderFront:nil];
+    }
 }
 
 @end
@@ -1801,6 +1849,9 @@ extern "C" void showSettingsWindow();
     // Update comprehensive status bar
     [self updateStatusBar];
     
+    // Restore scroll position for this file
+    [self restoreScrollPosition];
+    
     // Start watching file
     _fileWatcher->watch([path UTF8String]);
     _fileWatcher->start();
@@ -1869,9 +1920,33 @@ extern "C" void showSettingsWindow();
             [vc toggleFileBrowser];
         });
     } else {
-        // No command-line file or folder - try to restore last opened file
-        NSString* lastOpenedFile = [[NSUserDefaults standardUserDefaults] stringForKey:@"LastOpenedFile"];
-        if (lastOpenedFile && [[NSFileManager defaultManager] fileExistsAtPath:lastOpenedFile]) {
+        // No command-line file or folder - check for first launch or restore last file
+        NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+        BOOL hasLaunchedBefore = [defaults boolForKey:@"HasLaunchedBefore"];
+        NSString* lastOpenedFile = [defaults stringForKey:@"LastOpenedFile"];
+        
+        if (!hasLaunchedBefore) {
+            // First launch - show welcome document
+            [defaults setBool:YES forKey:@"HasLaunchedBefore"];
+            [defaults synchronize];
+            
+            // Look for welcome.md in app bundle resources
+            NSString* welcomePath = [[NSBundle mainBundle] pathForResource:@"welcome" ofType:@"md"];
+            if (!welcomePath) {
+                // Fallback to resources directory relative to executable
+                NSString* execPath = [[NSBundle mainBundle] executablePath];
+                NSString* resourcesPath = [[execPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"../../../resources/welcome.md"];
+                welcomePath = [resourcesPath stringByStandardizingPath];
+            }
+            
+            if (welcomePath && [[NSFileManager defaultManager] fileExistsAtPath:welcomePath]) {
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    NSLog(@"Showing welcome document: %@", welcomePath);
+                    [self openFile:welcomePath];
+                });
+            }
+        } else if (lastOpenedFile && [[NSFileManager defaultManager] fileExistsAtPath:lastOpenedFile]) {
+            // Not first launch - restore last opened file
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 NSLog(@"Restoring last opened file: %@", lastOpenedFile);
                 [self openFile:lastOpenedFile];
@@ -2319,7 +2394,7 @@ extern "C" void showSettingsWindow();
         
         NSUInteger textLength = [[textStorage string] length];
         
-        // First, re-highlight all results with yellow
+        // First, re-highlight all results with softer yellow
         for (NSInteger i = 0; i < count; i++) {
             @try {
                 id obj = [_searchResults objectAtIndex:i];
@@ -2332,7 +2407,7 @@ extern "C" void showSettingsWindow();
                     NSMaxRange(range) <= textLength) {
                     
                     NSColor* color = (i == _currentSearchIndex) ?
-                        [NSColor colorWithRed:1.0 green:0.5 blue:0.0 alpha:0.5] :  // Orange for current
+                        [NSColor colorWithRed:1.0 green:0.5 blue:0.0 alpha:0.7] :  // Brighter orange for current
                         [NSColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:0.3];   // Yellow for others
                     
                     [textStorage addAttribute:NSBackgroundColorAttributeName 
@@ -2353,8 +2428,12 @@ extern "C" void showSettingsWindow();
         NSString* text = [NSString stringWithFormat:@"%ld of %ld", 
                          _currentSearchIndex + 1, [_searchResults count]];
         [_searchResultLabel setStringValue:text];
+        
+        // Update main status bar to show search status
+        [self updateStatusBar];
     } else {
         [_searchResultLabel setStringValue:@""];
+        [self updateStatusBar];
     }
 }
 
@@ -3856,6 +3935,40 @@ extern "C" void showSettingsWindow();
     [self updateRecentFilesMenu];
 }
 
+// MARK: - Session Management
+
+- (void)saveScrollPosition {
+    if (!_currentFilePath || !_scrollView) return;
+    
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableDictionary* scrollPositions = [[defaults dictionaryForKey:@"ScrollPositions"] mutableCopy] ?: [NSMutableDictionary dictionary];
+    
+    // Get current scroll position
+    NSRect visibleRect = [_scrollView documentVisibleRect];
+    CGFloat scrollY = visibleRect.origin.y;
+    
+    // Save position for this file
+    [scrollPositions setObject:@(scrollY) forKey:_currentFilePath];
+    [defaults setObject:scrollPositions forKey:@"ScrollPositions"];
+    [defaults synchronize];
+}
+
+- (void)restoreScrollPosition {
+    if (!_currentFilePath || !_scrollView) return;
+    
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSDictionary* scrollPositions = [defaults dictionaryForKey:@"ScrollPositions"];
+    NSNumber* savedPosition = [scrollPositions objectForKey:_currentFilePath];
+    
+    if (savedPosition) {
+        // Restore scroll position after a short delay to ensure layout is complete
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSPoint scrollPoint = NSMakePoint(0, [savedPosition floatValue]);
+            [[_scrollView documentView] scrollPoint:scrollPoint];
+        });
+    }
+}
+
 // MARK: - Zoom Functions
 
 - (void)zoomIn:(id)sender {
@@ -4055,39 +4168,51 @@ extern "C" void showSettingsWindow();
 }
 
 - (void)updateStatusBar {
-    // Format file size
-    NSString* fileSizeStr = [self formatFileSize:_currentFileSize];
-    
     // Get filename
     NSString* filename = [_currentFilePath lastPathComponent] ?: @"Untitled";
     
-    // Get memory usage
-    _memoryUsage = [self getCurrentMemoryUsage];
-    NSString* memoryStr = [self formatFileSize:_memoryUsage];
+    // Calculate reading progress
+    CGFloat progress = 0.0;
+    if (_scrollView && _textView) {
+        NSRect visibleRect = [_scrollView documentVisibleRect];
+        NSRect fullRect = [_textView frame];
+        if (fullRect.size.height > 0) {
+            progress = (visibleRect.origin.y + visibleRect.size.height / 2.0) / fullRect.size.height;
+            progress = MIN(MAX(progress, 0.0), 1.0) * 100.0;
+        }
+    }
     
-    // Calculate cache hit rate (simulated for now)
-    _cacheHitRate = 94.0; // Will be replaced with real metrics later
+    // Calculate reading time (250 words per minute average)
+    NSUInteger wordCount = 0;
+    if (_textView) {
+        NSString* text = [[_textView textStorage] string];
+        if (text) {
+            // Simple word count - split by whitespace and newlines
+            NSArray* words = [text componentsSeparatedByCharactersInSet:
+                            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            wordCount = [[words filteredArrayUsingPredicate:
+                        [NSPredicate predicateWithFormat:@"length > 0"]] count];
+        }
+    }
+    NSUInteger readingMinutes = MAX(1, (wordCount + 249) / 250); // Round up
+    NSString* readingTime = readingMinutes == 1 ? @"~1 min read" : 
+                           [NSString stringWithFormat:@"~%lu min read", (unsigned long)readingMinutes];
     
-    // Get CPU usage
-    _cpuUsage = [self getCurrentCPUUsage];
+    // Search status
+    NSString* searchStatus = @"";
+    if (_searchResults && [_searchResults count] > 0) {
+        searchStatus = [NSString stringWithFormat:@" | Search: %ld/%lu", 
+                       (long)(_currentSearchIndex + 1), (unsigned long)[_searchResults count]];
+    }
     
-    // Reading time calculation removed - no longer needed
-    // NSString* readingTimeStr = [self calculateReadingTime];
-    
-    // Format the status bar
+    // Format the status bar - much cleaner
     NSString* status = [NSString stringWithFormat:
-        @"Inkwell v%s (Build %d) | %@ | %@ | %lu lines | Parse: %.0fms | Render: %.0fms | FPS: %.0f | Memory: %@ | Cache: %.0f%% | CPU: %.0f%%",
-        mdviewer::getVersionString(),
-        mdviewer::getBuildNumber(),
+        @"%@ | %@ | %.0f%% | %lu words%@",
         filename,
-        fileSizeStr, 
-        (unsigned long)_currentLineCount,
-        _lastParseTime,
-        _lastRenderTime,
-        _currentFPS > 0 ? _currentFPS : 120.0, // Default to 120 if not measured
-        memoryStr,
-        _cacheHitRate,
-        _cpuUsage
+        readingTime,
+        progress,
+        (unsigned long)wordCount,
+        searchStatus
     ];
     
     [_statusLabel setStringValue:status];
