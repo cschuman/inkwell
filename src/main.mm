@@ -1732,11 +1732,46 @@ extern "C" void showSettingsWindow();
         }
     }
     
+    // Check file size first to prevent hanging on large files
+    NSError* sizeError = nil;
+    NSDictionary* fileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:&sizeError];
+    if (sizeError) {
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setMessageText:@"Error checking file"];
+        [alert setInformativeText:sizeError.localizedDescription];
+        [alert addButtonWithTitle:@"OK"];
+        [alert runModal];
+        return;
+    }
+    
+    NSUInteger fileSize = [fileAttributes[NSFileSize] unsignedIntegerValue];
+    
+    // Warn for files over 5MB
+    if (fileSize > 5 * 1024 * 1024) {
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setMessageText:@"Large File Warning"];
+        NSString* sizeStr = [self formatFileSize:fileSize];
+        [alert setInformativeText:[NSString stringWithFormat:@"This file is %@. Opening large files may cause the app to become unresponsive. Do you want to continue?", sizeStr]];
+        [alert addButtonWithTitle:@"Open"];
+        [alert addButtonWithTitle:@"Cancel"];
+        
+        NSModalResponse response = [alert runModal];
+        if (response != NSAlertFirstButtonReturn) {
+            // User cancelled - don't save as last opened file
+            return;
+        }
+    }
+    
     // Add to recent files
     [self addToRecentFiles:path];
     
-    // Save as last opened file
-    [[NSUserDefaults standardUserDefaults] setObject:path forKey:@"LastOpenedFile"];
+    // Save as last opened file only if under 10MB to avoid startup hangs
+    if (fileSize < 10 * 1024 * 1024) {
+        [[NSUserDefaults standardUserDefaults] setObject:path forKey:@"LastOpenedFile"];
+    } else {
+        // Clear last opened file if it was a large file
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"LastOpenedFile"];
+    }
     [[NSUserDefaults standardUserDefaults] synchronize];
     
     NSError* error = nil;
@@ -1790,9 +1825,8 @@ extern "C" void showSettingsWindow();
         }
     }
     
-    // Get file stats
-    NSDictionary* fileAttributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
-    _currentFileSize = [fileAttributes[NSFileSize] unsignedIntegerValue];
+    // We already have file attributes from earlier
+    _currentFileSize = fileSize;
     _currentLineCount = [[processedContent componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] count];
     
     // Try to parse markdown with error handling
@@ -1946,11 +1980,22 @@ extern "C" void showSettingsWindow();
                 });
             }
         } else if (lastOpenedFile && [[NSFileManager defaultManager] fileExistsAtPath:lastOpenedFile]) {
-            // Not first launch - restore last opened file
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                NSLog(@"Restoring last opened file: %@", lastOpenedFile);
-                [self openFile:lastOpenedFile];
-            });
+            // Check if Shift key is held to skip restoring
+            NSEvent* currentEvent = [NSApp currentEvent];
+            BOOL shiftHeld = (currentEvent.modifierFlags & NSEventModifierFlagShift) != 0;
+            
+            if (shiftHeld) {
+                NSLog(@"Shift key held - skipping file restoration");
+                // Clear the last opened file to prevent issues
+                [defaults removeObjectForKey:@"LastOpenedFile"];
+                [defaults synchronize];
+            } else {
+                // Not first launch - restore last opened file
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    NSLog(@"Restoring last opened file: %@", lastOpenedFile);
+                    [self openFile:lastOpenedFile];
+                });
+            }
         }
     }
     
@@ -2031,12 +2076,12 @@ extern "C" void showSettingsWindow();
         [self showSearchBar];
         return;
     } else if ([key isEqualToString:@"g"] && (modifierFlags & NSEventModifierFlagCommand)) {
-        // Find next (Cmd+G)
-        if (![_searchBar isHidden]) {
-            if (modifierFlags & NSEventModifierFlagShift) {
+        // Find next (Cmd+G) or Find previous (Cmd+Shift+G)
+        if (![_searchBar isHidden] && _searchResults && [_searchResults count] > 0) {
+            if (modifierFlags == (NSEventModifierFlagCommand | NSEventModifierFlagShift)) {
                 [self findPrevious];  // Cmd+Shift+G for find previous
-            } else {
-                [self findNext];
+            } else if (modifierFlags == NSEventModifierFlagCommand) {
+                [self findNext];  // Cmd+G for find next
             }
         }
         return;
@@ -2168,7 +2213,9 @@ extern "C" void showSettingsWindow();
     scrollFrame.size.height = self.view.frame.size.height - 22 - 40; // status bar + search bar
     [_scrollView setFrame:scrollFrame];
     
-    // Focus on search field
+    // Focus on search field and ensure it's visible
+    [_searchField setStringValue:@""];
+    [[self.view window] makeFirstResponder:_searchField];
     [_searchField becomeFirstResponder];
     
     // Initialize search with retained instance
@@ -2178,6 +2225,7 @@ extern "C" void showSettingsWindow();
         _searchResults = [[NSMutableArray alloc] init];
     }
     _currentSearchIndex = -1;
+    [_searchResultLabel setStringValue:@""];
 }
 
 - (void)hideSearchBar {
