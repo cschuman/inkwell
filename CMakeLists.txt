@@ -56,7 +56,6 @@ add_library(mdviewer_platform STATIC
     src/platform/macos/cocoa_bridge.mm
     src/platform/macos/file_watcher.mm
     src/platform/macos/quick_look_plugin.mm
-    src/platform/macos/app_delegate.mm
 )
 
 target_link_libraries(mdviewer_platform PUBLIC

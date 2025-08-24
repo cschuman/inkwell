@@ -1,6 +1,6 @@
 cask "inkwell" do
-  version "1.0.7"
-  sha256 "3c6a8b4781ce1d7a69167ea19095a72c07780fb9b3fa066d42909ebb6a3d1a65"
+  version "1.0.9"
+  sha256 "98e7f2d994be9eb1312dcdd2c6642b2c9567c052232b7eaea117a5bb8d051463"
 
   url "https://github.com/cschuman/inkwell/releases/download/v#{version}/Inkwell-#{version}.dmg"
   name "Inkwell"
